@@ -46,8 +46,71 @@ Action ComportamientoIngeniero::think(Sensores sensores)
 // Niveles iniciales (Comportamientos reactivos simples)
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_0(Sensores sensores)
 {
-  Action accion = IDLE;
-  return accion;
+   bool tuberia = false;
+   int diferencia = 1;
+   Action accion = IDLE;
+
+   ComportamientoIngeniero::ActualizarMapa(sensores);
+
+   if(giro45izq == 0){
+      switch (sensores.superficie[0]){
+         case 'U':
+            tuberia = true;
+            break;
+         case 'D':
+            zapatillas = true;
+            break;
+      }
+
+      if(!tuberia){
+         char mejor = ' ';
+         int pos = -1;
+
+         if(zapatillas)
+            diferencia = 2;
+
+         for(int i = 1; i <= 3; ++i){
+            char letra = sensores.superficie[i];
+            
+            if(letra == 'U'){
+               mejor = letra;
+               pos = i;
+            }
+            else if(letra == 'D' && mejor != 'U'){
+               mejor = letra;
+               pos = i;
+            }
+            else if(letra == 'C' && mejor != 'U' && mejor != 'D'){
+               mejor = letra;
+               pos = i;
+            }
+         }
+
+         if(pos != -1 && abs(sensores.cota[pos] - sensores.cota[0]) <= diferencia){
+            if(pos == 1)
+               accion = TURN_SL;
+            else if(pos == 2)
+               accion = WALK;
+            else
+               accion = TURN_SR;
+         }
+         else
+            accion = TURN_SR;
+      }
+   }
+   else{
+      if(giro45izq > 0){
+         accion = TURN_SL;
+         --giro45izq;
+      }
+      else{
+         accion = TURN_SR;
+         ++giro45izq;
+      }          
+   }
+
+   accion_anterior = accion;
+   return accion;
 }
 
 /**

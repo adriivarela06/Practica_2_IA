@@ -31,9 +31,58 @@ Action ComportamientoTecnico::think(Sensores sensores) {
 
 // Niveles del técnico
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_0(Sensores sensores) {
-  Action accion = IDLE;
+   bool tuberia = false;
+   Action accion = IDLE;
 
-  return accion;
+   ComportamientoTecnico::ActualizarMapa(sensores);
+
+   if(giro45izq == 0){
+      if (sensores.superficie[0] == 'U'){
+         tuberia = true;
+      }
+
+      if(!tuberia){
+         char mejor = ' ';
+         int pos = -1;
+
+         for(int i = 1; i <= 3; ++i){
+            char letra = sensores.superficie[i];
+            
+            if(letra == 'U'){
+               mejor = letra;
+               pos = i;
+            }
+            else if((letra == 'C' || letra == 'D') && mejor != 'U'){
+               mejor = letra;
+               pos = i;
+            }
+         }
+
+         if(pos != -1 && abs(sensores.cota[pos] - sensores.cota[0]) <= 1){
+            if(pos == 1)
+               accion = TURN_SL;
+            else if(pos == 2)
+               accion = WALK;
+            else
+               accion = TURN_SR;
+         }
+         else
+            accion = TURN_SR;
+      }
+   }
+   else{
+      if(giro45izq > 0){
+         accion = TURN_SL;
+         --giro45izq;
+      }
+      else{
+         accion = TURN_SR;
+         ++giro45izq;
+      }          
+   }
+
+   accion_anterior = accion;
+   return accion;
 }
 
 /**

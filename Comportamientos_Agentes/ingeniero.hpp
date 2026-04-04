@@ -22,6 +22,9 @@ public:
    */
   ComportamientoIngeniero(unsigned int size = 0) : Comportamiento(size) {
     // Inicializar Variables de Estado
+    zapatillas = false;
+    accion_anterior = IDLE;
+    giro45izq = 0;
   }
 
   /**
@@ -182,6 +185,10 @@ private:
   // =========================================================================
   // VARIABLES DE ESTADO (PUEDEN SER EXTENDIDAS POR EL ALUMNO)
   // =========================================================================
+
+  bool zapatillas;
+  Action accion_anterior;
+  int giro45izq;
 
 };
 

@@ -44,7 +44,8 @@ public:
                        std::vector<std::vector<unsigned char>> mapaC): 
                        Comportamiento(mapaR, mapaC) {
     // Inicializar Variables de Estado
-
+      accion_anterior = IDLE;
+      giro45izq = 0;
   }
 
   ComportamientoTecnico(const ComportamientoTecnico &comport): Comportamiento(comport) {}
@@ -188,7 +189,8 @@ private:
   // VARIABLES DE ESTADO (PUEDEN SER EXTENDIDAS POR EL ALUMNO)
   // =========================================================================
 
-  
+  Action accion_anterior;
+  int giro45izq;
 };
 
 #endif
