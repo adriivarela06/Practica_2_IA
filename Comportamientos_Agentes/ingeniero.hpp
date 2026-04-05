@@ -36,6 +36,9 @@ public:
                          std::vector<std::vector<unsigned char>> mapaC): 
                          Comportamiento(mapaR, mapaC) {
     // Inicializar Variables de Estado
+    zapatillas = false;
+    accion_anterior = IDLE;
+    giro45izq = 0;
   }
 
   ComportamientoIngeniero(const ComportamientoIngeniero &comport)
