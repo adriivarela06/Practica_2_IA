@@ -55,13 +55,18 @@ int VeoCasillaInteresanteI(char i, char c, char d, bool zapatillas){
    if(c == 'U') return 2;
    else if(i == 'U') return 1;
    else if(d == 'U') return 3;
-   else if(!zapatillas && c == 'D') return 2;
-   else if(!zapatillas && i == 'D') return 1;
-   else if(!zapatillas && d == 'D') return 3;
-   else if(c == 'C') return 2;
-   else if(i == 'C') return 1;
-   else if(d == 'C') return 3;
-   else return 0;
+
+   if(!zapatillas){
+      if(c == 'D') return 2;
+      else if(i == 'D') return 1;
+      else if(d == 'D') return 3;
+   }
+
+   if(c == 'C' || c == 'D') return 2;
+   else if(i == 'C' || i == 'D') return 1;
+   else if(d == 'C' || d == 'D') return 3;
+
+   return 0;
 }
 
 /**
@@ -91,6 +96,10 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_0(Sensores sensores
    char i = ViablePorAlturaI(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], zapatillas);
    char c = ViablePorAlturaI(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], zapatillas);
    char d = ViablePorAlturaI(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], zapatillas);
+
+   if (sensores.agentes[1] != '_') i = 'P';
+   if (sensores.agentes[2] != '_') c = 'P';
+   if (sensores.agentes[3] != '_') d = 'P';
 
    int pos = VeoCasillaInteresanteI(i, c, d, zapatillas);
 
