@@ -5,6 +5,7 @@
 #include <time.h>
 #include <thread>
 #include <list>
+#include <map>
 
 #include "comportamientos/comportamiento.hpp"
 
@@ -35,7 +36,6 @@ public:
     // Inicializar Variables de Estado
     zapatillas = false;
     accion_anterior = IDLE;
-    giro45izq = 0;
   }
 
   /**
@@ -49,7 +49,6 @@ public:
     // Inicializar Variables de Estado
       zapatillas = false;
       accion_anterior = IDLE;
-      giro45izq = 0;
   }
 
   ComportamientoTecnico(const ComportamientoTecnico &comport): Comportamiento(comport) {}
@@ -194,8 +193,8 @@ private:
   // =========================================================================
 
   Action accion_anterior;
-  int giro45izq;
   bool zapatillas;
+  map<pair<int, int>, int> mapaCalor;
 };
 
 #endif

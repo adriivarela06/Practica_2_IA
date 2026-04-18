@@ -24,7 +24,6 @@ public:
     // Inicializar Variables de Estado
     zapatillas = false;
     accion_anterior = IDLE;
-    giro45izq = 0;
   }
 
   /**
@@ -38,7 +37,6 @@ public:
     // Inicializar Variables de Estado
     zapatillas = false;
     accion_anterior = IDLE;
-    giro45izq = 0;
   }
 
   ComportamientoIngeniero(const ComportamientoIngeniero &comport)
@@ -191,8 +189,7 @@ private:
 
   bool zapatillas;
   Action accion_anterior;
-  int giro45izq;
-
+  map<pair<int, int>, int> mapaCalor;
 };
 
 #endif

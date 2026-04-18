@@ -28,6 +28,51 @@ Action ComportamientoTecnico::think(Sensores sensores) {
   return accion;
 }
 
+static void Coordenadas(Sensores sensores, int &fI, int &cI, int &fC, int &cC, int &fD, int &cD){
+   switch (sensores.rumbo) {
+      case norte:
+         fI = sensores.posF - 1; cI = sensores.posC - 1;
+         fC = sensores.posF - 1; cC = sensores.posC;
+         fD = sensores.posF - 1; cD = sensores.posC + 1;
+         break;
+      case noreste:
+         fI = sensores.posF - 1; cI = sensores.posC;
+         fC = sensores.posF - 1; cC = sensores.posC + 1;
+         fD = sensores.posF;     cD = sensores.posC + 1;
+         break;
+      case este:
+         fI = sensores.posF - 1; cI = sensores.posC + 1;
+         fC = sensores.posF;     cC = sensores.posC + 1;
+         fD = sensores.posF + 1; cD = sensores.posC + 1;
+         break;
+      case sureste:
+         fI = sensores.posF;     cI = sensores.posC + 1;
+         fC = sensores.posF + 1; cC = sensores.posC + 1;
+         fD = sensores.posF + 1; cD = sensores.posC;
+         break;
+      case sur:
+         fI = sensores.posF + 1; cI = sensores.posC + 1;
+         fC = sensores.posF + 1; cC = sensores.posC;
+         fD = sensores.posF + 1; cD = sensores.posC - 1;
+         break;
+      case suroeste:
+         fI = sensores.posF + 1; cI = sensores.posC;
+         fC = sensores.posF + 1; cC = sensores.posC - 1;
+         fD = sensores.posF;     cD = sensores.posC - 1;
+         break;
+      case oeste:
+         fI = sensores.posF + 1; cI = sensores.posC - 1;
+         fC = sensores.posF;     cC = sensores.posC - 1;
+         fD = sensores.posF - 1; cD = sensores.posC - 1;
+         break;
+      case noroeste:
+         fI = sensores.posF;     cI = sensores.posC - 1;
+         fC = sensores.posF - 1; cC = sensores.posC - 1;
+         fD = sensores.posF - 1; cD = sensores.posC;
+         break;
+   }
+}
+
 /**
  * @brief Determina la mejor opcion entre las 3 casillas que tiene delante
  * 
@@ -36,7 +81,7 @@ Action ComportamientoTecnico::think(Sensores sensores) {
  * @param d terreno que hay en la posicion 3 de la superficie
  * @return 2 si es mejor WALK, 1 para TURN_SL y 3 para TURN_SR, 0 si no hay nada interesante
  */
-int VeoCasillaInteresanteT(char i, char c, char d, bool zapatillas){
+int VeoCasillaInteresanteT0(char i, char c, char d, bool zapatillas, int calorI, int calorC, int calorD){
    if(c == 'U') return 2;
    else if(i == 'U') return 1;
    else if(d == 'U') return 3;
@@ -47,11 +92,31 @@ int VeoCasillaInteresanteT(char i, char c, char d, bool zapatillas){
       else if(d == 'D') return 3;
    }
 
-   if(c == 'C' || c == 'D') return 2;
-   else if(i == 'C' || i == 'D') return 1;
-   else if(d == 'C' || d == 'D') return 3;
+   bool viableI = (i == 'C' || i == 'D');
+   bool viableC = (c == 'C' || c == 'D');
+   bool viableD = (d == 'C' || d == 'D');
 
-   return 0;
+   if (!viableI && !viableC && !viableD) return 0;
+
+   int mejorOpcion = 0;
+   int menorCalor = 9999;
+
+   if (viableC && calorC <= menorCalor) { 
+      menorCalor = calorC; 
+      mejorOpcion = 2; 
+   }
+   
+   if (viableI && calorI < menorCalor) { 
+      menorCalor = calorI; 
+      mejorOpcion = 1; 
+   }
+   
+   if (viableD && calorD < menorCalor) { 
+      menorCalor = calorD; 
+      mejorOpcion = 3; 
+   }
+
+   return mejorOpcion;
 }
 
 /**
@@ -61,7 +126,7 @@ int VeoCasillaInteresanteT(char i, char c, char d, bool zapatillas){
  * @param zapatillas indica si tengo las zapatillas
  * @return 'P' si no es accesible por altura y casilla en otro caso
  */
-char ViablePorAlturaT(char casilla, int dif, bool zapatillas){
+char ViablePorAlturaT0(char casilla, int dif, bool zapatillas){
    if(abs(dif) <= 1)
       return casilla;
    else
@@ -73,19 +138,29 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_0(Sensores sensores) {
    Action accion = IDLE;
    ActualizarMapa(sensores);
 
-   if(sensores.superficie[0] == 'D') zapatillas = true;
-
    if(sensores.superficie[0] == 'U') return IDLE;
 
-   char i = ViablePorAlturaT(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], zapatillas);
-   char c = ViablePorAlturaT(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], zapatillas);
-   char d = ViablePorAlturaT(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], zapatillas);
+   if(sensores.superficie[0] == 'D') zapatillas = true;
+
+   if(accion_anterior == WALK) mapaCalor[{sensores.posF, sensores.posC}]++;
+
+   char i = ViablePorAlturaT0(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], zapatillas);
+   char c = ViablePorAlturaT0(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], zapatillas);
+   char d = ViablePorAlturaT0(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], zapatillas);
 
    if (sensores.agentes[1] != '_') i = 'P';
    if (sensores.agentes[2] != '_') c = 'P';
    if (sensores.agentes[3] != '_') d = 'P';
 
-   int pos = VeoCasillaInteresanteT(i, c, d, zapatillas);
+   int fI, cI, fC, cC, fD, cD;
+
+   Coordenadas(sensores, fI, cI, fC, cC, fD, cD);
+
+   int calorI = mapaCalor[{fI, cI}];
+   int calorC = mapaCalor[{fC, cC}];
+   int calorD = mapaCalor[{fD, cD}];
+
+   int pos = VeoCasillaInteresanteT0(i, c, d, zapatillas, calorI, calorC, calorD);
 
    switch (pos)
    {
@@ -116,6 +191,76 @@ bool ComportamientoTecnico::es_camino(unsigned char c) const {
   return (c == 'C' || c == 'D' || c == 'U');
 }
 
+int ObtenerCosteTerrenoT1(unsigned char c, bool zapatillas) {
+   if (c == 'U') return 0;
+   if (c == 'C' || c == 'D') return 1;
+   if (c == 'S') return 2;
+   if (c == 'H') return 3;
+   if (c == 'B' && zapatillas) return 4;
+    
+   return 9999;
+}
+
+/**
+ * @brief Determina la mejor opcion entre las 3 casillas que tiene delante
+ * 
+ * @param i terreno que hay en la posicion 1 de la superficie
+ * @param c terreno que hay en la posicion 2 de la superficie
+ * @param d terreno que hay en la posicion 3 de la superficie
+ * @return 2 si es mejor WALK, 1 para TURN_SL y 3 para TURN_SR, 0 si no hay nada interesante
+ */
+int VeoCasillaInteresanteT1(char i, char c, char d, bool zapatillas, int calorI, int calorC, int calorD){
+   if (!zapatillas) {
+      if (c == 'D') return 2;
+      else if (i == 'D') return 1;
+      else if (d == 'D') return 3;
+   }
+
+   int costeI = ObtenerCosteTerrenoT1(i, zapatillas);
+   int costeC = ObtenerCosteTerrenoT1(c, zapatillas);
+   int costeD = ObtenerCosteTerrenoT1(d, zapatillas);
+
+   if (costeI == 9999 && costeC == 9999 && costeD == 9999) return 0;
+
+   costeI += (calorI * 10);
+   costeC += (calorC * 10);
+   costeD += (calorD * 10);
+   
+   int mejorOpcion = 0;
+   int mejorCoste = 99999;
+
+   if (costeI < mejorCoste) { 
+      mejorCoste = costeI; 
+      mejorOpcion = 1;
+   }
+
+   if (costeC <= mejorCoste) { 
+      mejorCoste = costeC; 
+      mejorOpcion = 2;
+   }
+   
+   if (costeD < mejorCoste) { 
+      mejorCoste = costeD; 
+      mejorOpcion = 3;
+   }
+
+   return mejorOpcion;
+}
+
+/**
+ * @brief Determina si la casilla es viable por altura.
+ * @param casilla tipo de terreno
+ * @param dif diferencia de altura entre casillas
+ * @param zapatillas indica si tengo las zapatillas
+ * @return 'P' si no es accesible por altura y casilla en otro caso
+ */
+
+char ViablePorAlturaT1(char casilla, int dif, bool zapatillas){
+   if(abs(dif) <= 1)
+      return casilla;
+   else
+      return 'P';
+}
 
 /**
  * @brief Comportamiento reactivo del técnico para el Nivel 1.
@@ -123,7 +268,49 @@ bool ComportamientoTecnico::es_camino(unsigned char c) const {
  * @return Acción a realizar.
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_1(Sensores sensores) {
-  return IDLE;
+   Action accion = IDLE;
+   ActualizarMapa(sensores);
+
+   if (sensores.superficie[0] == 'D' && !zapatillas) zapatillas = true;
+
+   if(accion_anterior == WALK) mapaCalor[{sensores.posF, sensores.posC}]++;
+
+   char i = ViablePorAlturaT1(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], zapatillas);
+   char c = ViablePorAlturaT1(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], zapatillas);
+   char d = ViablePorAlturaT1(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], zapatillas);
+
+   if (sensores.agentes[1] != '_') i = 'P';
+   if (sensores.agentes[2] != '_') c = 'P';
+   if (sensores.agentes[3] != '_') d = 'P';
+
+   int fI, cI, fC, cC, fD, cD;
+
+   Coordenadas(sensores, fI, cI, fC, cC, fD, cD);
+
+   int calorI = mapaCalor[{fI, cI}];
+   int calorC = mapaCalor[{fC, cC}];
+   int calorD = mapaCalor[{fD, cD}];
+
+   int pos = VeoCasillaInteresanteT1(i, c, d, zapatillas, calorI, calorC, calorD);
+
+   switch (pos)
+   {
+   case 2:
+      accion = WALK;
+      break;
+   case 1:
+      accion = TURN_SL;
+      break;
+   case 3:
+      accion = TURN_SR;
+      break;
+   default:
+      accion = TURN_SL;
+      break;
+   }
+
+   accion_anterior = accion;
+   return accion;
 }
 
 /**
