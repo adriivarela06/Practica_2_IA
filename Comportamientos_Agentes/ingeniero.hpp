@@ -224,6 +224,8 @@ private:
 
    bool hayPlan;
    list<Action> plan;
+
+   vector<vector<unsigned char>> matrizAgentes;
 };
 
 #endif

@@ -313,13 +313,161 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_1(Sensores sensores) {
    return accion;
 }
 
+ubicacion SiguienteCasillaT(const ubicacion &origen) {
+   ubicacion sig = origen;
+   switch (origen.brujula) {
+      case norte:    sig.f--; break;
+      case noreste:  sig.f--; sig.c++; break;
+      case este:     sig.c++; break;
+      case sureste:  sig.f++; sig.c++; break;
+      case sur:      sig.f++; break;
+      case suroeste: sig.f++; sig.c--; break;
+      case oeste:    sig.c--; break;
+      case noroeste: sig.f--; sig.c--; break;
+   }
+   return sig;
+}
+
+bool EsMovimientoLegalT(Action accion, const EstadoT &st, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
+   if (accion == TURN_SL || accion == TURN_SR) return true;
+   if (accion != WALK) return false;
+
+   ubicacion destino = SiguienteCasillaT(st.site);
+
+   if (destino.f < 0 || destino.f >= (int)terreno.size() || destino.c < 0 || destino.c >= (int)terreno[0].size()) return false;
+
+   unsigned char t = terreno[destino.f][destino.c];
+   if (t == 'M' || t == 'P') return false;
+   if (t == 'B' && !st.zapatillas) return false;
+
+   if (agentes[destino.f][destino.c] != '_') return false;
+
+   int dif_altura = abs(altura[destino.f][destino.c] - altura[st.site.f][st.site.c]);
+   if (dif_altura > 1) return false;
+
+   return true;
+}
+
+EstadoT AplicarAccionT(Action accion, const EstadoT &st, const vector<vector<unsigned char>> &terreno) {
+   EstadoT next_st = st;
+
+   switch (accion) {
+      case WALK:
+         next_st.site = SiguienteCasillaT(st.site);
+         break;
+      case TURN_SL:
+         next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 7) % 8);
+         break;
+      case TURN_SR:
+         next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 1) % 8);
+         break;
+   }
+
+   if (terreno[next_st.site.f][next_st.site.c] == 'D')
+      next_st.zapatillas = true;
+
+   return next_st;
+}
+
+// =========================================================================
+// BÚSQUEDA EN ANCHURA (ESTILO OPTIMIZADO)
+// =========================================================================
+
+list<Action> B_Anchura_Tecnico(const EstadoT &inicio, const ubicacion &final, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
+   queue<NodoT> frontier;
+   set<EstadoT> explored;
+
+   NodoT nodo_inicial;
+   nodo_inicial.estado = inicio;
+   
+   frontier.push(nodo_inicial);
+   explored.insert(inicio);
+
+   vector<Action> acciones_posibles = {WALK, TURN_SL, TURN_SR};
+
+   while (!frontier.empty()) {
+      NodoT current_node = frontier.front();
+      frontier.pop();
+
+      if (current_node.estado.site.f == final.f && current_node.estado.site.c == final.c) {
+         return current_node.secuencia;
+      }
+
+      for (Action accion : acciones_posibles) {
+         if (EsMovimientoLegalT(accion, current_node.estado, terreno, altura, agentes)) {
+            NodoT child;
+            child.estado = AplicarAccionT(accion, current_node.estado, terreno);
+            
+            if (explored.find(child.estado) == explored.end()) {
+               child.secuencia = current_node.secuencia;
+               child.secuencia.push_back(accion);
+               
+               frontier.push(child);
+               explored.insert(child.estado);
+            }
+         }
+      }
+   }
+
+   return {};
+}
+
 /**
  * @brief Comportamiento del técnico para el Nivel 2.
  * @param sensores Datos actuales de los sensores.
  * @return Acción a realizar.
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_2(Sensores sensores) {
-  return IDLE;
+   Action accion = IDLE;
+
+   if (matrizAgentes.empty() && mapaResultado.size() > 0)
+      matrizAgentes.assign(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
+
+   if (!hayPlan) {
+      EstadoT inicio;
+      inicio.site.f = sensores.posF; 
+      inicio.site.c = sensores.posC; 
+      inicio.site.brujula = sensores.rumbo;
+      inicio.zapatillas = this->zapatillas;
+
+      ubicacion objetivo;
+      objetivo.f = sensores.BelPosF; 
+      objetivo.c = sensores.BelPosC;
+
+      plan = B_Anchura_Tecnico(inicio, objetivo, mapaResultado, mapaCotas, matrizAgentes);
+      
+      if (plan.size() > 0) {
+         VisualizaPlan(inicio.site, plan);
+         hayPlan = true;
+      }
+   }
+
+   if (hayPlan && !plan.empty()) {
+      Action a = plan.front();
+      bool choque = false;
+      ubicacion actual = {sensores.posF, sensores.posC, sensores.rumbo};
+
+      if (a == WALK && sensores.agentes[2] != '_') {
+         choque = true;
+         ubicacion obs = SiguienteCasillaT(actual);
+         if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
+            matrizAgentes[obs.f][obs.c] = sensores.agentes[2];
+      }
+
+      if (choque) {
+         hayPlan = false;
+         plan.clear();
+      } else {
+         accion = plan.front();
+         plan.pop_front();
+      }
+   }
+   
+   if (plan.empty()) {
+      hayPlan = false;
+   }
+
+   return accion;
 }
 
 /**

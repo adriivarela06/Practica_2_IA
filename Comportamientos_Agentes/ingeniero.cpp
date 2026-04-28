@@ -340,7 +340,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores
 
 // Niveles avanzados (Uso de búsqueda)
 
-ubicacion SiguienteCasilla(const ubicacion &origen, int pasos = 1) {
+ubicacion SiguienteCasillaI(const ubicacion &origen, int pasos = 1) {
    ubicacion sig = origen;
    switch (origen.brujula) {
       case norte:    sig.f -= pasos; break;
@@ -355,17 +355,22 @@ ubicacion SiguienteCasilla(const ubicacion &origen, int pasos = 1) {
    return sig;
 }
 
-bool EsMovimientoLegal(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
+bool EsMovimientoLegalI(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
    if (accion == TURN_SL || accion == TURN_SR) return true;
 
    ubicacion origen = st.site;
    ubicacion destino;
    
-   if (accion == WALK)
-      destino = SiguienteCasilla(origen, 1);
+   if (accion == WALK) {
+      destino = SiguienteCasillaI(origen, 1);
+
+      if (destino.f < 0 || destino.f >= terreno.size() || destino.c < 0 || destino.c >= terreno[0].size()) return false;
+
+      if (agentes[destino.f][destino.c] != '_') return false; 
+   }
    else if (accion == JUMP) {
-      destino = SiguienteCasilla(origen, 2);
-      ubicacion intermedia = SiguienteCasilla(origen, 1);
+      destino = SiguienteCasillaI(origen, 2);
+      ubicacion intermedia = SiguienteCasillaI(origen, 1);
       
       unsigned char terr_int = terreno[intermedia.f][intermedia.c];
       if (terr_int == 'M' || terr_int == 'P' || terr_int == 'B') return false;
@@ -395,15 +400,15 @@ bool EsMovimientoLegal(Action accion, const EstadoI &st, const vector<vector<uns
    return true;
 }
 
-EstadoI AplicarAccion(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno) {
+EstadoI AplicarAccionI(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno) {
    EstadoI next_st = st;
 
    switch (accion) {
       case WALK:
-         next_st.site = SiguienteCasilla(st.site, 1);
+         next_st.site = SiguienteCasillaI(st.site, 1);
          break;
       case JUMP:
-         next_st.site = SiguienteCasilla(st.site, 2);
+         next_st.site = SiguienteCasillaI(st.site, 2);
          break;
       case TURN_SL:
          next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 7) % 8);
@@ -423,10 +428,9 @@ EstadoI AplicarAccion(Action accion, const EstadoI &st, const vector<vector<unsi
 // ALGORITMO DE BÚSQUEDA EN ANCHURA (BFS)
 // =========================================================================
 
-list<Action> BusquedaAnchuraNivel2(const EstadoI &inicio, const ubicacion &final, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
+list<Action> B_Anchura_Ingeniero(const EstadoI &inicio, const ubicacion &final, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
    queue<NodoI> frontier;
    set<EstadoI> explored;
-   list<Action> path;
 
    NodoI nodo_inicial;
    nodo_inicial.estado = inicio;
@@ -445,9 +449,9 @@ list<Action> BusquedaAnchuraNivel2(const EstadoI &inicio, const ubicacion &final
       }
 
       for (Action accion : acciones_posibles) {
-         if (EsMovimientoLegal(accion, current_node.estado, terreno, altura, agentes)) {
+         if (EsMovimientoLegalI(accion, current_node.estado, terreno, altura, agentes)) {
             NodoI child;
-            child.estado = AplicarAccion(accion, current_node.estado, terreno);
+            child.estado = AplicarAccionI(accion, current_node.estado, terreno);
             
             if (explored.find(child.estado) == explored.end()) {
                child.secuencia = current_node.secuencia;
@@ -460,7 +464,7 @@ list<Action> BusquedaAnchuraNivel2(const EstadoI &inicio, const ubicacion &final
       }
    }
 
-   return path;
+   return {};
 }
 
 /**
@@ -470,22 +474,24 @@ list<Action> BusquedaAnchuraNivel2(const EstadoI &inicio, const ubicacion &final
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores)
 {
-  Action accion = IDLE;
+   Action accion = IDLE;
+
+   if (matrizAgentes.empty() && mapaResultado.size() > 0) {
+      matrizAgentes.assign(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
+   }
 
    if (!hayPlan) {
       EstadoI inicio;
       inicio.site.f = sensores.posF;
       inicio.site.c = sensores.posC;
       inicio.site.brujula = sensores.rumbo;
-      inicio.zapatillas = false; 
+      inicio.zapatillas = this->zapatillas; 
       
       ubicacion objetivo;
       objetivo.f = sensores.BelPosF;
       objetivo.c = sensores.BelPosC;
 
-      vector<vector<unsigned char>> mapaAgentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_')); 
-      
-      plan = BusquedaAnchuraNivel2(inicio, objetivo, mapaResultado, mapaCotas, mapaAgentes);
+      plan = B_Anchura_Ingeniero(inicio, objetivo, mapaResultado, mapaCotas, matrizAgentes);
       
       if (plan.size() > 0) {
          VisualizaPlan(inicio.site, plan);
@@ -493,9 +499,39 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores
       }
    }
 
-   if (hayPlan && plan.size() > 0) {
-      accion = plan.front();
-      plan.pop_front();
+   if (hayPlan && !plan.empty()) {
+      Action a = plan.front();
+      bool choque = false;
+      ubicacion actual = {sensores.posF, sensores.posC, sensores.rumbo};
+
+      if (a == WALK && sensores.agentes[2] != '_') {
+         choque = true;
+         ubicacion obs = SiguienteCasillaI(actual, 1);
+         if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
+            matrizAgentes[obs.f][obs.c] = sensores.agentes[2];
+      } 
+      else if (a == JUMP) {
+         if (sensores.agentes[2] != '_') {
+            choque = true;
+            ubicacion obs = SiguienteCasillaI(actual, 1);
+            if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
+               matrizAgentes[obs.f][obs.c] = sensores.agentes[2];
+         }
+         if (sensores.agentes[6] != '_') {
+            choque = true;
+            ubicacion obs = SiguienteCasillaI(actual, 2);
+            if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
+               matrizAgentes[obs.f][obs.c] = sensores.agentes[6];
+         }
+      }
+
+      if (choque) {
+         hayPlan = false;
+         plan.clear();
+      } else {
+         accion = plan.front();
+         plan.pop_front();
+      }
    }
 
    if (plan.size() == 0)

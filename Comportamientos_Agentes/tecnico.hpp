@@ -20,7 +20,34 @@
  * El técnico colabora con el ingeniero para resolver el problema de instalación de tuberías
  */
 
+ struct EstadoT {
+   ubicacion site;
+   bool zapatillas;
 
+   bool operator==(const EstadoT &st) const {
+      return (site == st.site) && (zapatillas == st.zapatillas);
+   }
+
+   bool operator<(const EstadoT &st) const {
+      if (site.f != st.site.f) return site.f < st.site.f;
+      if (site.c != st.site.c) return site.c < st.site.c;
+      if (site.brujula != st.site.brujula) return site.brujula < st.site.brujula;
+      return zapatillas < st.zapatillas;
+   }
+};
+
+struct NodoT {
+   EstadoT estado;
+   std::list<Action> secuencia;
+
+   bool operator==(const NodoT &node) const {
+      return estado == node.estado;
+   }
+
+   bool operator<(const NodoT &node) const {
+      return estado < node.estado; 
+   }
+};
 
 class ComportamientoTecnico : public Comportamiento {
 public:
@@ -36,6 +63,7 @@ public:
     // Inicializar Variables de Estado
     zapatillas = false;
     accion_anterior = IDLE;
+    hayPlan = false;
   }
 
   /**
@@ -49,6 +77,7 @@ public:
     // Inicializar Variables de Estado
       zapatillas = false;
       accion_anterior = IDLE;
+      hayPlan = false;
   }
 
   ComportamientoTecnico(const ComportamientoTecnico &comport): Comportamiento(comport) {}
@@ -139,7 +168,8 @@ protected:
    * @param f Fila de la casilla.
    * @param c Columna de la casilla.
    * @param tieneZapatillas Indica si el agente posee las zapatillas.
-   * @return true si la casilla es transitable.
+   * @return true s(site.f == st.site.f) && (site.c == st.site.c) && 
+             (site.brujula == st.site.brujula)i la casilla es transitable.
    */
   bool EsCasillaTransitableLevel0(int f, int c, bool tieneZapatillas);
 
@@ -195,6 +225,11 @@ private:
   Action accion_anterior;
   bool zapatillas;
   map<pair<int, int>, int> mapaCalor;
+
+  bool hayPlan;
+  list<Action> plan;
+
+  vector<vector<unsigned char>> matrizAgentes;
 };
 
 #endif
