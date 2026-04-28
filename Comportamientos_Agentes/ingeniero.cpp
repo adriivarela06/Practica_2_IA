@@ -409,7 +409,8 @@ EstadoI AplicarAccion(Action accion, const EstadoI &st, const vector<vector<unsi
          next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 7) % 8);
          break;
       case TURN_SR:
-         next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 1) % 8);         break;
+         next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 1) % 8);
+         break;
    }
 
    if (terreno[next_st.site.f][next_st.site.c] == 'D')
