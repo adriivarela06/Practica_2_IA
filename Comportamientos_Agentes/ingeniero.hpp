@@ -10,6 +10,35 @@
 
 #include "comportamientos/comportamiento.hpp"
 
+struct EstadoI {
+   ubicacion site;
+   bool zapatillas;
+
+   bool operator==(const EstadoI &st) const {
+      return (site == st.site) && (zapatillas == st.zapatillas);
+   }
+
+   bool operator<(const EstadoI &st) const {
+      if (site.f != st.site.f) return site.f < st.site.f;
+      if (site.c != st.site.c) return site.c < st.site.c;
+      if (site.brujula != st.site.brujula) return site.brujula < st.site.brujula;
+      return zapatillas < st.zapatillas;
+   }
+};
+
+struct NodoI {
+   EstadoI estado;
+   list<Action> secuencia;
+
+   bool operator==(const NodoI &node) const {
+      return estado == node.estado;
+   }
+
+   bool operator<(const NodoI &node) const {
+      return estado < node.estado; 
+   }
+};
+
 class ComportamientoIngeniero : public Comportamiento {
 public:
   // =========================================================================
@@ -24,6 +53,7 @@ public:
     // Inicializar Variables de Estado
     zapatillas = false;
     accion_anterior = IDLE;
+    hayPlan = false;
   }
 
   /**
@@ -37,6 +67,7 @@ public:
     // Inicializar Variables de Estado
     zapatillas = false;
     accion_anterior = IDLE;
+    hayPlan = false;
   }
 
   ComportamientoIngeniero(const ComportamientoIngeniero &comport)
@@ -187,9 +218,12 @@ private:
   // VARIABLES DE ESTADO (PUEDEN SER EXTENDIDAS POR EL ALUMNO)
   // =========================================================================
 
-  bool zapatillas;
-  Action accion_anterior;
-  map<pair<int, int>, int> mapaCalor;
+   bool zapatillas;
+   Action accion_anterior;
+   map<pair<int, int>, int> mapaCalor;
+
+   bool hayPlan;
+   list<Action> plan;
 };
 
 #endif

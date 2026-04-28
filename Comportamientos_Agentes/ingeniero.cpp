@@ -3,6 +3,7 @@
 #include <iostream>
 #include <queue>
 #include <set>
+#include <cmath>
 
 using namespace std;
 
@@ -338,6 +339,129 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores
 }
 
 // Niveles avanzados (Uso de búsqueda)
+
+ubicacion SiguienteCasilla(const ubicacion &origen, int pasos = 1) {
+   ubicacion sig = origen;
+   switch (origen.brujula) {
+      case norte:    sig.f -= pasos; break;
+      case noreste:  sig.f -= pasos; sig.c += pasos; break;
+      case este:     sig.c += pasos; break;
+      case sureste:  sig.f += pasos; sig.c += pasos; break;
+      case sur:      sig.f += pasos; break;
+      case suroeste: sig.f += pasos; sig.c -= pasos; break;
+      case oeste:    sig.c -= pasos; break;
+      case noroeste: sig.f -= pasos; sig.c -= pasos; break;
+   }
+   return sig;
+}
+
+bool EsMovimientoLegal(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
+   if (accion == TURN_SL || accion == TURN_SR) return true;
+
+   ubicacion origen = st.site;
+   ubicacion destino;
+   
+   if (accion == WALK)
+      destino = SiguienteCasilla(origen, 1);
+   else if (accion == JUMP) {
+      destino = SiguienteCasilla(origen, 2);
+      ubicacion intermedia = SiguienteCasilla(origen, 1);
+      
+      unsigned char terr_int = terreno[intermedia.f][intermedia.c];
+      if (terr_int == 'M' || terr_int == 'P' || terr_int == 'B') return false;
+      if (agentes[intermedia.f][intermedia.c] != '_') return false; 
+   } else {
+      return false;
+   }
+
+   if (destino.f < 0 || destino.f >= terreno.size() || destino.c < 0 || destino.c >= terreno[0].size()) return false;
+
+   unsigned char terr_dest = terreno[destino.f][destino.c];
+   if (terr_dest == 'M' || terr_dest == 'P' || terr_dest == 'B') return false;
+
+   int alt_origen = altura[origen.f][origen.c];
+   int alt_dest = altura[destino.f][destino.c];
+   int dif_altura = abs(alt_dest - alt_origen);
+   
+   int dif_maxima;
+   if (st.zapatillas == true)
+      dif_maxima = 2;
+   else
+      dif_maxima = 1;
+   
+   
+   if (dif_altura > dif_maxima) return false;
+
+   return true;
+}
+
+EstadoI AplicarAccion(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno) {
+   EstadoI next_st = st;
+
+   switch (accion) {
+      case WALK:
+         next_st.site = SiguienteCasilla(st.site, 1);
+         break;
+      case JUMP:
+         next_st.site = SiguienteCasilla(st.site, 2);
+         break;
+      case TURN_SL:
+         next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 7) % 8);
+         break;
+      case TURN_SR:
+         next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 1) % 8);         break;
+   }
+
+   if (terreno[next_st.site.f][next_st.site.c] == 'D')
+      next_st.zapatillas = true;
+
+   return next_st;
+}
+
+// =========================================================================
+// ALGORITMO DE BÚSQUEDA EN ANCHURA (BFS)
+// =========================================================================
+
+list<Action> BusquedaAnchuraNivel2(const EstadoI &inicio, const ubicacion &final, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
+   queue<NodoI> frontier;
+   set<EstadoI> explored;
+   list<Action> path;
+
+   NodoI nodo_inicial;
+   nodo_inicial.estado = inicio;
+   
+   frontier.push(nodo_inicial);
+   explored.insert(inicio);
+
+   vector<Action> acciones_posibles = {WALK, JUMP, TURN_SL, TURN_SR};
+
+   while (!frontier.empty()) {
+      NodoI current_node = frontier.front();
+      frontier.pop();
+
+      if (current_node.estado.site.f == final.f && current_node.estado.site.c == final.c) {
+         return current_node.secuencia;
+      }
+
+      for (Action accion : acciones_posibles) {
+         if (EsMovimientoLegal(accion, current_node.estado, terreno, altura, agentes)) {
+            NodoI child;
+            child.estado = AplicarAccion(accion, current_node.estado, terreno);
+            
+            if (explored.find(child.estado) == explored.end()) {
+               child.secuencia = current_node.secuencia;
+               child.secuencia.push_back(accion);
+               
+               frontier.push(child);
+               explored.insert(child.estado);
+            }
+         }
+      }
+   }
+
+   return path;
+}
+
 /**
  * @brief Comportamiento del ingeniero para el Nivel 2 (búsqueda).
  * @param sensores Datos actuales de los sensores.
@@ -345,8 +469,38 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores)
 {
-  // TODO: Implementar búsqueda para el Nivel 2.
-  return IDLE;
+  Action accion = IDLE;
+
+   if (!hayPlan) {
+      EstadoI inicio;
+      inicio.site.f = sensores.posF;
+      inicio.site.c = sensores.posC;
+      inicio.site.brujula = sensores.rumbo;
+      inicio.zapatillas = false; 
+      
+      ubicacion objetivo;
+      objetivo.f = sensores.BelPosF;
+      objetivo.c = sensores.BelPosC;
+
+      vector<vector<unsigned char>> mapaAgentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_')); 
+      
+      plan = BusquedaAnchuraNivel2(inicio, objetivo, mapaResultado, mapaCotas, mapaAgentes);
+      
+      if (plan.size() > 0) {
+         VisualizaPlan(inicio.site, plan);
+         hayPlan = true;
+      }
+   }
+
+   if (hayPlan && plan.size() > 0) {
+      accion = plan.front();
+      plan.pop_front();
+   }
+
+   if (plan.size() == 0)
+      hayPlan = false;
+
+   return accion;
 }
 
 /**
