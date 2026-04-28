@@ -334,7 +334,8 @@ bool EsMovimientoLegalT(Action accion, const EstadoT &st, const vector<vector<un
 
    ubicacion destino = SiguienteCasillaT(st.site);
 
-   if (destino.f < 0 || destino.f >= (int)terreno.size() || destino.c < 0 || destino.c >= (int)terreno[0].size()) return false;
+   if (destino.f < 0 || destino.f >= (int)terreno.size() || destino.c < 0 || destino.c >= (int)terreno[0].size()) 
+      return false;
 
    unsigned char t = terreno[destino.f][destino.c];
    if (t == 'M' || t == 'P') return false;
@@ -370,7 +371,7 @@ EstadoT AplicarAccionT(Action accion, const EstadoT &st, const vector<vector<uns
 }
 
 // =========================================================================
-// BÚSQUEDA EN ANCHURA (ESTILO OPTIMIZADO)
+// BÚSQUEDA EN ANCHURA
 // =========================================================================
 
 list<Action> B_Anchura_Tecnico(const EstadoT &inicio, const ubicacion &final, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
@@ -389,9 +390,8 @@ list<Action> B_Anchura_Tecnico(const EstadoT &inicio, const ubicacion &final, co
       NodoT current_node = frontier.front();
       frontier.pop();
 
-      if (current_node.estado.site.f == final.f && current_node.estado.site.c == final.c) {
+      if (current_node.estado.site.f == final.f && current_node.estado.site.c == final.c)
          return current_node.secuencia;
-      }
 
       for (Action accion : acciones_posibles) {
          if (EsMovimientoLegalT(accion, current_node.estado, terreno, altura, agentes)) {
@@ -418,6 +418,15 @@ list<Action> B_Anchura_Tecnico(const EstadoT &inicio, const ubicacion &final, co
  * @return Acción a realizar.
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_2(Sensores sensores) {
+   return IDLE;
+}
+
+/**
+ * @brief Comportamiento del técnico para el Nivel 3.
+ * @param sensores Datos actuales de los sensores.
+ * @return Acción a realizar.
+ */
+Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
    Action accion = IDLE;
 
    if (matrizAgentes.empty() && mapaResultado.size() > 0)
@@ -468,15 +477,6 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_2(Sensores sensores) {
    }
 
    return accion;
-}
-
-/**
- * @brief Comportamiento del técnico para el Nivel 3.
- * @param sensores Datos actuales de los sensores.
- * @return Acción a realizar.
- */
-Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
-  return IDLE;
 }
 
 /**

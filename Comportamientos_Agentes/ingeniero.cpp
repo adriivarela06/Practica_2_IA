@@ -357,33 +357,34 @@ ubicacion SiguienteCasillaI(const ubicacion &origen, int pasos = 1) {
 
 bool EsMovimientoLegalI(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
    if (accion == TURN_SL || accion == TURN_SR) return true;
-
+ 
    ubicacion origen = st.site;
    ubicacion destino;
    
    if (accion == WALK) {
       destino = SiguienteCasillaI(origen, 1);
-
+ 
       if (destino.f < 0 || destino.f >= terreno.size() || destino.c < 0 || destino.c >= terreno[0].size()) return false;
-
+ 
       if (agentes[destino.f][destino.c] != '_') return false; 
    }
    else if (accion == JUMP) {
       destino = SiguienteCasillaI(origen, 2);
       ubicacion intermedia = SiguienteCasillaI(origen, 1);
+ 
+      if (intermedia.f < 0 || intermedia.f >= (int)terreno.size() || intermedia.c < 0 || intermedia.c >= (int)terreno[0].size()) return false;
       
       unsigned char terr_int = terreno[intermedia.f][intermedia.c];
       if (terr_int == 'M' || terr_int == 'P' || terr_int == 'B') return false;
       if (agentes[intermedia.f][intermedia.c] != '_') return false; 
-   } else {
+   } else
       return false;
-   }
-
+ 
    if (destino.f < 0 || destino.f >= terreno.size() || destino.c < 0 || destino.c >= terreno[0].size()) return false;
-
+ 
    unsigned char terr_dest = terreno[destino.f][destino.c];
    if (terr_dest == 'M' || terr_dest == 'P' || terr_dest == 'B') return false;
-
+ 
    int alt_origen = altura[origen.f][origen.c];
    int alt_dest = altura[destino.f][destino.c];
    int dif_altura = abs(alt_dest - alt_origen);
@@ -396,13 +397,13 @@ bool EsMovimientoLegalI(Action accion, const EstadoI &st, const vector<vector<un
    
    
    if (dif_altura > dif_maxima) return false;
-
+ 
    return true;
 }
 
 EstadoI AplicarAccionI(Action accion, const EstadoI &st, const vector<vector<unsigned char>> &terreno) {
    EstadoI next_st = st;
-
+ 
    switch (accion) {
       case WALK:
          next_st.site = SiguienteCasillaI(st.site, 1);
@@ -417,10 +418,12 @@ EstadoI AplicarAccionI(Action accion, const EstadoI &st, const vector<vector<uns
          next_st.site.brujula = (Orientacion)(((int)st.site.brujula + 1) % 8);
          break;
    }
-
-   if (terreno[next_st.site.f][next_st.site.c] == 'D')
+ 
+   if (next_st.site.f >= 0 && next_st.site.f < (int)terreno.size() && 
+       next_st.site.c >= 0 && next_st.site.c < (int)terreno[0].size() && 
+       terreno[next_st.site.f][next_st.site.c] == 'D')
       next_st.zapatillas = true;
-
+ 
    return next_st;
 }
 
@@ -444,9 +447,8 @@ list<Action> B_Anchura_Ingeniero(const EstadoI &inicio, const ubicacion &final, 
       NodoI current_node = frontier.front();
       frontier.pop();
 
-      if (current_node.estado.site.f == final.f && current_node.estado.site.c == final.c) {
+      if (current_node.estado.site.f == final.f && current_node.estado.site.c == final.c)
          return current_node.secuencia;
-      }
 
       for (Action accion : acciones_posibles) {
          if (EsMovimientoLegalI(accion, current_node.estado, terreno, altura, agentes)) {
@@ -476,9 +478,8 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores
 {
    Action accion = IDLE;
 
-   if (matrizAgentes.empty() && mapaResultado.size() > 0) {
+   if (matrizAgentes.empty() && mapaResultado.size() > 0)
       matrizAgentes.assign(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
-   }
 
    if (!hayPlan) {
       EstadoI inicio;
@@ -547,7 +548,12 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores)
 {
-  return IDLE;
+   Action accion = IDLE;
+
+   if (sensores.agentes[2] == 'T') 
+      accion = TURN_SR;
+
+   return accion;
 }
 
 /**
