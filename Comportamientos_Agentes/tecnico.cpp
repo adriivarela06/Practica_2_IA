@@ -378,8 +378,10 @@ EstadoT AplicarAccionT(Action accion, const EstadoT &st, const vector<vector<uns
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_2(Sensores sensores) {
    Action accion = TURN_SL;
 
+   if (sensores.superficie[0] == 'D') zapatillas = true;
+
    bool ingenieroCerca = false;
-   for (int i = 1; i <= 3; i++) {
+   for (int i = 1; i <= 8; i++) {
       if (sensores.agentes[i] == 'i') {
          ingenieroCerca = true;
          break;
@@ -491,6 +493,8 @@ list<Action> A_Estrella_Tecnico(const EstadoT &inicio, const ubicacion &final, c
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
    Action accion = IDLE;
 
+   if (sensores.superficie[0] == 'D') zapatillas = true;
+
    if (matrizAgentes.empty() && mapaResultado.size() > 0)
       matrizAgentes.assign(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
 
@@ -522,8 +526,7 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
         choque = true;
 
     if (choque) {
-        hayPlan = false;
-        plan.clear();
+        accion = IDLE;
     } else {
         accion = plan.front();
         plan.pop_front();
