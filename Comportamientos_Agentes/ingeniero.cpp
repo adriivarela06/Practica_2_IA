@@ -503,27 +503,13 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores
    if (hayPlan && !plan.empty()) {
       Action a = plan.front();
       bool choque = false;
-      ubicacion actual = {sensores.posF, sensores.posC, sensores.rumbo};
 
-      if (a == WALK && sensores.agentes[2] != '_') {
+      if (a == WALK && sensores.agentes[2] != '_')
          choque = true;
-         ubicacion obs = SiguienteCasillaI(actual, 1);
-         if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
-            matrizAgentes[obs.f][obs.c] = sensores.agentes[2];
-      } 
+
       else if (a == JUMP) {
-         if (sensores.agentes[2] != '_') {
-            choque = true;
-            ubicacion obs = SiguienteCasillaI(actual, 1);
-            if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
-               matrizAgentes[obs.f][obs.c] = sensores.agentes[2];
-         }
-         if (sensores.agentes[6] != '_') {
-            choque = true;
-            ubicacion obs = SiguienteCasillaI(actual, 2);
-            if (obs.f >= 0 && obs.f < matrizAgentes.size() && obs.c >= 0 && obs.c < matrizAgentes[0].size())
-               matrizAgentes[obs.f][obs.c] = sensores.agentes[6];
-         }
+         if (sensores.agentes[2] != '_') choque = true;
+         if (sensores.agentes[6] != '_') choque = true;
       }
 
       if (choque) {
@@ -548,10 +534,28 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores)
 {
-   Action accion = IDLE;
+   Action accion = TURN_SL;
 
-   if (sensores.agentes[2] == 'T') 
-      accion = TURN_SR;
+   bool tecnicoCerca = false;
+   for (int i = 1; i <= 3; i++) {
+      if (sensores.agentes[i] == 't') {
+         tecnicoCerca = true;
+         break;
+      }
+   }
+
+   if (tecnicoCerca) {
+      int dif_altura = abs(sensores.cota[2] - sensores.cota[0]);
+      int dif_maxima = zapatillas ? 2 : 1;
+      
+      if (sensores.superficie[2] != 'M' && sensores.superficie[2] != 'P' && 
+          sensores.superficie[2] != 'B' && sensores.agentes[2] == '_' && 
+          dif_altura <= dif_maxima) {
+         accion = WALK;
+      } else {
+         accion = TURN_SL;
+      }
+   }
 
    return accion;
 }

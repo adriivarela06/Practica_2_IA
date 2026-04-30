@@ -38,7 +38,9 @@
 
 struct NodoT {
    EstadoT estado;
-   std::list<Action> secuencia;
+   list<Action> secuencia;
+   int coste;      
+   int heuristica; 
 
    bool operator==(const NodoT &node) const {
       return estado == node.estado;
@@ -47,6 +49,12 @@ struct NodoT {
    bool operator<(const NodoT &node) const {
       return estado < node.estado; 
    }
+};
+
+struct ComparaNodosT {
+    bool operator()(const NodoT& a, const NodoT& b) const {
+        return (a.coste + a.heuristica) > (b.coste + b.heuristica);
+    }
 };
 
 class ComportamientoTecnico : public Comportamiento {
