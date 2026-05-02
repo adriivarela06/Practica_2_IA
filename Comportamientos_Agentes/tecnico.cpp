@@ -435,10 +435,6 @@ int CalcularCosteT(Action accion, const EstadoT &st, const vector<vector<unsigne
    return coste_base;
 }
 
-// =========================================================================
-// ALGORITMO A* PARA EL TÉCNICO (NIVEL 3)
-// =========================================================================
-
 list<Action> A_Estrella_Tecnico(const EstadoT &inicio, const ubicacion &final, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, const vector<vector<unsigned char>> &agentes) {
    priority_queue<NodoT, vector<NodoT>, ComparaNodosT> frontier;
    map<EstadoT, int> costos_minimos;
