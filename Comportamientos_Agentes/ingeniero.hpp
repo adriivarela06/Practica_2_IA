@@ -44,6 +44,18 @@ struct NodoTuberia {
    int altura_mod;        
    int op;                
    int energia;
+   int eco;       
+   int dist;      
+
+   // Magia de Dijkstra: 1º busca el camino más corto. 2º Si miden igual, el que gaste menos.
+   bool operator>(const NodoTuberia &otro) const {
+      if (dist != otro.dist) return dist > otro.dist;
+      return (energia + eco) > (otro.energia + otro.eco);
+   }
+};
+
+struct Padre {
+   int f, c, op;
 };
 
 class ComportamientoIngeniero : public Comportamiento {

@@ -564,7 +564,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores
 }
 
 // =========================================================================
-// FUNCIÓN DE COSTE DE ENERGÍA
+// FUNCIONES DE COSTE (EXACTAS AL MANUAL)
 // =========================================================================
 
 int CalcularEnergiaTuberia(unsigned char terreno, int op) {
@@ -591,29 +591,52 @@ int CalcularEnergiaTuberia(unsigned char terreno, int op) {
    return energia;
 }
 
+int CalcularEcoTuberia(unsigned char terreno, int op) {
+   int eco = 0;
+    
+   if (terreno == 'A') eco += 50;
+   else if (terreno == 'H') eco += 55;
+   else if (terreno == 'S') eco += 25;
+   else if (terreno == 'C' || terreno == 'U') eco += 15;
+   else eco += 30;
+
+   if (op == 1) {
+      if (terreno == 'H') eco += 55;
+      else if (terreno == 'S') eco += 30;
+      else if (terreno == 'C' || terreno == 'U') eco += 10;
+      else eco += 40;
+   }
+   else if (op == -1) {
+      if (terreno == 'H') eco += 65;
+      else if (terreno == 'S') eco += 40;
+      else if (terreno == 'C' || terreno == 'U') eco += 25;
+      else eco += 50;
+   }
+   return eco;
+}
+
 // =========================================================================
-// ALGORITMO BFS SÚPER OPTIMIZADO (CON BACKTRACKING)
+// ALGORITMO DIJKSTRA PARA TUBERÍAS (LA VERSIÓN DEFINITIVA)
 // =========================================================================
 
-// Estructura auxiliar para reconstruir el camino al revés
-struct Padre {
-    int f, c, op;
-};
-
-list<Paso> BFS_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia) {
-   queue<NodoTuberia> frontier;
+list<Paso> Dijkstra_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia) {
+   // Usamos priority_queue para garantizar que siempre sacamos el mejor camino posible
+   priority_queue<NodoTuberia, vector<NodoTuberia>, greater<NodoTuberia>> frontier;
    
-   // Guarda la energía mínima gastada para llegar a {f, c, op}
-   vector<vector<vector<int>>> min_energia(terreno.size(), vector<vector<int>>(terreno[0].size(), vector<int>(3, 999999)));
-   
-   // Guarda de dónde venimos para reconstruir el camino al final (Backtracking)
-   // Las llaves del mapa son "strings" simplificados: "fila_col_op" -> Padre
-   map<tuple<int, int, int>, Padre> came_from;
+   int filas = terreno.size();
+   int cols = terreno[0].size();
 
-   // 1. Inicialización
+   // Guarda el coste del mejor camino encontrado hasta cada casilla {distancia, recursos_totales}
+   vector<vector<vector<pair<int, int>>>> best_cost(filas, vector<vector<pair<int, int>>>(cols, vector<pair<int, int>>(3, {999999, 999999})));
+   
+   // Guarda de dónde venimos para reconstruir el camino
+   vector<vector<vector<Padre>>> came_from(filas, vector<vector<Padre>>(cols, vector<Padre>(3, {-1, -1, -1})));
+
+   // 1. Inicialización en la Belkanita
    for (int o = -1; o <= 1; o++) {
       unsigned char t_ini = terreno[inicio_f][inicio_c];
       
+      // Prohibiciones mecánicas estrictas
       if (o != 0 && t_ini == 'A') continue;
       if (o == 1 && altura[inicio_f][inicio_c] >= 9) continue;
       if (o == -1 && altura[inicio_f][inicio_c] <= 1) continue;
@@ -623,37 +646,49 @@ list<Paso> BFS_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned
       inicial.c = inicio_c;
       inicial.op = o;
       inicial.altura_mod = altura[inicio_f][inicio_c] + o;
-      
-      // Asumimos que la base inicial no cuesta energía (ya está la Belkanita)
-      inicial.energia = 0; 
+      inicial.dist = 1;
+      inicial.energia = CalcularEnergiaTuberia(t_ini, o);
+      inicial.eco = CalcularEcoTuberia(t_ini, o);
 
-      frontier.push(inicial);
-      min_energia[inicio_f][inicio_c][o + 1] = 0;
+      // Iniciamos si no revienta la batería en el primer paso
+      if (inicial.energia <= max_energia) {
+         frontier.push(inicial);
+         best_cost[inicio_f][inicio_c][o + 1] = {1, inicial.energia + inicial.eco};
+      }
    }
 
    int df[] = {-1, 1, 0, 0};
    int dc[] = {0, 0, 1, -1};
 
-   tuple<int, int, int> meta_encontrada = {-1, -1, -1};
-
-   // 2. Bucle principal BFS
+   // 2. Bucle principal de Dijkstra
    while (!frontier.empty()) {
-      NodoTuberia actual = frontier.front();
+      NodoTuberia actual = frontier.top();
       frontier.pop();
 
+      // Al usar priority_queue, la primera vez que tocamos 'U' está garantizado que es el camino óptimo global
       if (terreno[actual.f][actual.c] == 'U') {
-         meta_encontrada = {actual.f, actual.c, actual.op};
-         break; // Encontramos la meta, salimos a reconstruir el camino
+         list<Paso> camino_final;
+         Padre curr = {actual.f, actual.c, actual.op};
+         
+         // Reconstruimos la tubería hacia atrás
+         while (true) {
+             camino_final.push_front({curr.f, curr.c, curr.op});
+             Padre p = came_from[curr.f][curr.c][curr.op + 1];
+             if (p.f == -1) break; // Llegamos al inicio
+             curr = p;
+         }
+         return camino_final;
       }
 
+      // 3. Exploramos vecinos ortogonales
       for (int i = 0; i < 4; i++) {
          int nf = actual.f + df[i];
          int nc = actual.c + dc[i];
 
-         if (nf >= 0 && nf < (int)terreno.size() && nc >= 0 && nc < (int)terreno[0].size()) {
+         if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
                 
-            // Bosque 'B' está permitido. Muro y Precipicio NO.
+            // Bosque 'B' está permitido, Muro y Precipicio NO.
             if (t != 'M' && t != 'P') {
                
                for (int nop = -1; nop <= 1; nop++) {
@@ -662,25 +697,32 @@ list<Paso> BFS_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned
                   if (nop == -1 && altura[nf][nc] <= 1) continue;
 
                   int nalt = altura[nf][nc] + nop;
+                  int dif_alt = actual.altura_mod - nalt;
 
-                  // GRAVEDAD: Mientras no suba (la tubería no puede ir hacia arriba)
-                  if (actual.altura_mod >= nalt) {
+                  // GRAVEDAD ESTRICTA: La diferencia tiene que ser exactamente 0 o 1
+                  if (dif_alt == 0 || dif_alt == 1) {
                      int n_energia = actual.energia + CalcularEnergiaTuberia(t, nop);
+                     int n_eco = actual.eco + CalcularEcoTuberia(t, nop);
+                     
+                     if (n_energia <= max_energia) {
+                        pair<int, int> coste_hijo = {actual.dist + 1, n_energia + n_eco};
 
-                     if (n_energia <= max_energia && n_energia < min_energia[nf][nc][nop + 1]) {
-                        min_energia[nf][nc][nop + 1] = n_energia;
-                        
-                        NodoTuberia hijo;
-                        hijo.f = nf;
-                        hijo.c = nc;
-                        hijo.op = nop;
-                        hijo.altura_mod = nalt;
-                        hijo.energia = n_energia;
-                        
-                        // Guardamos quién es el padre para luego hacer el camino inverso
-                        came_from[{nf, nc, nop}] = {actual.f, actual.c, actual.op};
-                        
-                        frontier.push(hijo);
+                        // Si encontramos una forma MEJOR de llegar a este estado, lo apuntamos
+                        if (coste_hijo < best_cost[nf][nc][nop + 1]) {
+                           best_cost[nf][nc][nop + 1] = coste_hijo;
+                           came_from[nf][nc][nop + 1] = {actual.f, actual.c, actual.op};
+                           
+                           NodoTuberia hijo;
+                           hijo.f = nf;
+                           hijo.c = nc;
+                           hijo.op = nop;
+                           hijo.altura_mod = nalt;
+                           hijo.energia = n_energia;
+                           hijo.eco = n_eco;
+                           hijo.dist = actual.dist + 1;
+                           
+                           frontier.push(hijo);
+                        }
                      }
                   }
                }
@@ -689,23 +731,7 @@ list<Paso> BFS_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned
       }
    }
 
-   // 3. Reconstrucción del camino (Backtracking)
-   list<Paso> camino_final;
-   if (get<0>(meta_encontrada) != -1) {
-       tuple<int, int, int> actual = meta_encontrada;
-       
-       while (true) {
-           camino_final.push_front({get<0>(actual), get<1>(actual), get<2>(actual)});
-           
-           // Si llegamos al inicio (no tiene padre), salimos del bucle
-           if (came_from.find(actual) == came_from.end()) break;
-           
-           Padre p = came_from[actual];
-           actual = {p.f, p.c, p.op};
-       }
-   }
-
-   return camino_final; 
+   return {}; 
 }
 
 /**
@@ -717,12 +743,12 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_4(Sensores sensores
 {
    if (hayPlan) return IDLE;
 
-   list<Paso> plan_tuberias = BFS_Tuberias(
+   list<Paso> plan_tuberias = Dijkstra_Tuberias(
       sensores.BelPosF, 
       sensores.BelPosC, 
       mapaResultado, 
       mapaCotas,
-      sensores.energia 
+      sensores.energia // Único límite duro que necesitamos
    );
 
    if (!plan_tuberias.empty()) {
@@ -732,6 +758,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_4(Sensores sensores
 
    return IDLE;
 }
+
 
 /**
  * @brief Comportamiento del ingeniero para el Nivel 5.
