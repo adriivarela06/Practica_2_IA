@@ -613,9 +613,8 @@ list<Paso> Algoritmo_Tuberias(int inicio_f, int inicio_c, const vector<vector<un
    int filas = terreno.size(),
        cols = terreno[0].size();
 
-   vector<vector<vector<pair<int, int>>>> mejor_coste(filas, vector<vector<pair<int, int>>>(cols, vector<pair<int, int>>(3, {999999, 999999})));
-   
-   vector<vector<vector<Padre>>> viene_de(filas, vector<vector<Padre>>(cols, vector<Padre>(3, {-1, -1, -1})));
+   map<Padre, pair<int, int>> mejor_coste;
+   map<Padre, Padre> viene_de;
 
    for (int i = -1; i <= 1; i++) {
       unsigned char t_ini = terreno[inicio_f][inicio_c];
@@ -632,7 +631,7 @@ list<Paso> Algoritmo_Tuberias(int inicio_f, int inicio_c, const vector<vector<un
 
          if (inicial.energia <= max_energia) {
             frontier.push(inicial);
-            mejor_coste[inicio_f][inicio_c][i + 1] = {1, inicial.energia + inicial.eco};
+            mejor_coste[{inicio_f, inicio_c, i}] = {1, inicial.energia + inicial.eco};
          }
       }
    }
@@ -651,11 +650,11 @@ list<Paso> Algoritmo_Tuberias(int inicio_f, int inicio_c, const vector<vector<un
          bool salida = false;
          while (!salida) {
             camino_final.push_front({curr.f, curr.c, curr.op});
-            Padre p = viene_de[curr.f][curr.c][curr.op + 1];
-            if (p.f == -1) 
+            if (viene_de.find(curr) == viene_de.end()) {
                salida = true;
-            else 
-               curr = p;
+            } else {
+               curr = viene_de[curr];
+            }
          }
 
          return camino_final;
@@ -681,10 +680,11 @@ list<Paso> Algoritmo_Tuberias(int inicio_f, int inicio_c, const vector<vector<un
                            
                         if (n_energia <= max_energia) {
                            pair<int, int> coste_hijo = {actual.dist + 1, n_energia + n_eco};
+                           Padre estado_hijo = {nf, nc, nop};
 
-                           if (coste_hijo < mejor_coste[nf][nc][nop + 1]) {
-                              mejor_coste[nf][nc][nop + 1] = coste_hijo;
-                              viene_de[nf][nc][nop + 1] = {actual.f, actual.c, actual.op};
+                           if (mejor_coste.find(estado_hijo) == mejor_coste.end() || coste_hijo < mejor_coste[estado_hijo]) {
+                              mejor_coste[estado_hijo] = coste_hijo;
+                              viene_de[estado_hijo] = {actual.f, actual.c, actual.op};
                                  
                               NodoTuberia hijo;
                               hijo.f = nf;
