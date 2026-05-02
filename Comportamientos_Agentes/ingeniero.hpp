@@ -39,6 +39,13 @@ struct NodoI {
    }
 };
 
+struct NodoTuberia {
+   int f, c;              
+   int altura_mod;        
+   int op;                
+   list<Paso> camino;     
+};
+
 class ComportamientoIngeniero : public Comportamiento {
 public:
   // =========================================================================

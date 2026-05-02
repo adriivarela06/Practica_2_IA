@@ -563,6 +563,161 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores
    return accion;
 }
 
+// =========================================================================
+// FUNCIONES DE COSTE PARA TUBERÍAS (NIVEL 4)
+// =========================================================================
+
+int CalcularEnergiaTuberia(unsigned char terreno, int op) {
+   int energia = 0;
+   
+   // Coste base de INSTALL
+   if (terreno == 'A') energia += 60;
+   else if (terreno == 'H') energia += 45;
+   else if (terreno == 'S') energia += 25;
+   else if (terreno == 'C' || terreno == 'U') energia += 15;
+   else energia += 30; // Entra 'B', 'D', 'X'
+
+   // Coste de RAISE
+   if (op == 1) {
+      if (terreno == 'H') energia += 55;
+      else if (terreno == 'S') energia += 30;
+      else if (terreno == 'C' || terreno == 'U') energia += 10;
+      else energia += 40;
+   }
+   // Coste de DIG
+   else if (op == -1) {
+      if (terreno == 'H') energia += 65;
+      else if (terreno == 'S') energia += 40;
+      else if (terreno == 'C' || terreno == 'U') energia += 25;
+      else energia += 50;
+   }
+   return energia;
+}
+
+int CalcularEcoTuberia(unsigned char terreno, int op) {
+   int eco = 0;
+    
+   // Coste base de INSTALL
+   if (terreno == 'A') eco += 50;
+   else if (terreno == 'H') eco += 55;
+   else if (terreno == 'S') eco += 25;
+   else if (terreno == 'C' || terreno == 'U') eco += 15;
+   else eco += 30;
+
+   // Coste de RAISE
+   if (op == 1) {
+      if (terreno == 'H') eco += 55; // CORREGIDO (Antes 65)
+      else if (terreno == 'S') eco += 30;
+      else if (terreno == 'C' || terreno == 'U') eco += 10;
+      else eco += 40;
+   }
+   // Coste de DIG
+   else if (op == -1) {
+      if (terreno == 'H') eco += 65;
+      else if (terreno == 'S') eco += 40;
+      else if (terreno == 'C' || terreno == 'U') eco += 25;
+      else eco += 50;
+   }
+
+   return eco;
+}
+
+// =========================================================================
+// ALGORITMO BFS PARA TUBERÍAS (NIVEL 4 - VERSIÓN DEFINITIVA PARETO)
+// =========================================================================
+
+// =========================================================================
+// ALGORITMO BFS PARA TUBERÍAS (NIVEL 4 - VERSIÓN PURA Y DIRECTA)
+// =========================================================================
+
+list<Paso> BFS_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura) {
+   queue<NodoTuberia> frontier;
+   
+   // Array 3D para visitados: visited[fila][columna][operacion]
+   // Como 'op' va de -1 a 1, le sumamos 1 para usar índices 0, 1 y 2.
+   vector<vector<vector<bool>>> visited(terreno.size(), vector<vector<bool>>(terreno[0].size(), vector<bool>(3, false)));
+
+   // 1. Inicialización desde la Belkanita
+   for (int o = -1; o <= 1; o++) {
+      unsigned char t_ini = terreno[inicio_f][inicio_c];
+      
+      // Reglas mecánicas básicas
+      if (o != 0 && t_ini == 'A') continue;
+      if (o == 1 && altura[inicio_f][inicio_c] >= 9) continue;
+      if (o == -1 && altura[inicio_f][inicio_c] <= 1) continue;
+
+      NodoTuberia inicial;
+      inicial.f = inicio_f;
+      inicial.c = inicio_c;
+      inicial.op = o;
+      inicial.altura_mod = altura[inicio_f][inicio_c] + o;
+      inicial.camino.push_back({inicio_f, inicio_c, o});
+        
+      frontier.push(inicial);
+      visited[inicio_f][inicio_c][o + 1] = true;
+   }
+
+   int df[] = {-1, 1, 0, 0};
+   int dc[] = {0, 0, 1, -1};
+
+   // 2. Bucle principal de BFS
+   while (!frontier.empty()) {
+      NodoTuberia actual = frontier.front();
+      frontier.pop();
+
+      // Si llegamos a una base de recolección, devolvemos el camino directamente
+      if (terreno[actual.f][actual.c] == 'U') {
+         return actual.camino;
+      }
+
+      // 3. Explorar vecinos ortogonales
+      for (int i = 0; i < 4; i++) {
+         int nf = actual.f + df[i];
+         int nc = actual.c + dc[i];
+
+         // Comprobar que no nos salimos del mapa
+         if (nf >= 0 && nf < (int)terreno.size() && nc >= 0 && nc < (int)terreno[0].size()) {
+            unsigned char t = terreno[nf][nc];
+                
+            // ¡IMPORTANTE! Solo bloqueamos Muro y Precipicio. El Bosque ('B') ESTÁ PERMITIDO.
+            if (t != 'M' && t != 'P') {
+               
+               // Generamos las 3 opciones de altura para la nueva casilla
+               for (int nop = -1; nop <= 1; nop++) {
+                  if (nop != 0 && t == 'A') continue;
+                  if (nop == 1 && altura[nf][nc] >= 9) continue;
+                  if (nop == -1 && altura[nf][nc] <= 1) continue;
+
+                  int nalt = altura[nf][nc] + nop;
+                  int dif_alt = actual.altura_mod - nalt;
+
+                  // REGLA DE LA GRAVEDAD: La diferencia debe ser exactamente 0 o 1
+                  if (dif_alt == 0 || dif_alt == 1) {
+                     
+                     // Si no hemos visitado este estado, lo encolamos
+                     if (!visited[nf][nc][nop + 1]) {
+                        visited[nf][nc][nop + 1] = true;
+                        
+                        NodoTuberia hijo;
+                        hijo.f = nf;
+                        hijo.c = nc;
+                        hijo.op = nop;
+                        hijo.altura_mod = nalt;
+                        hijo.camino = actual.camino;
+                        hijo.camino.push_back({nf, nc, nop});
+                        
+                        frontier.push(hijo);
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   return {}; // Devuelve lista vacía si es imposible
+}
+
 /**
  * @brief Comportamiento del ingeniero para el Nivel 4.
  * @param sensores Datos actuales de los sensores.
@@ -570,7 +725,22 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_4(Sensores sensores)
 {
-  return IDLE;
+   if (hayPlan) return IDLE;
+
+   // Llamada limpia, solo buscando el camino más corto válido físicamente
+   list<Paso> plan_tuberias = BFS_Tuberias(
+      sensores.BelPosF, 
+      sensores.BelPosC, 
+      mapaResultado, 
+      mapaCotas
+   );
+
+   if (!plan_tuberias.empty()) {
+      VisualizaRedTuberias(plan_tuberias);
+      hayPlan = true;
+   }
+
+   return IDLE;
 }
 
 /**
