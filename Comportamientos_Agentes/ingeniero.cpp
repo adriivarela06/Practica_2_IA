@@ -742,18 +742,47 @@ Orientacion CalcularOrientacionHaciaObjetivoI(int fila_origen, int col_origen, i
    return norte; 
 }
 
-Action NavegarHaciaDestinoI(Sensores &sensores, ubicacion objetivo, bool tiene_zapatillas, const vector<vector<unsigned char>> &mapaResultado, const vector<vector<unsigned char>> &mapaCotas) {
-   EstadoI inicio;
-   inicio.site.f = sensores.posF;
-   inicio.site.c = sensores.posC;
-   inicio.site.brujula = sensores.rumbo;
-   inicio.zapatillas = tiene_zapatillas;
-    
-   vector<vector<unsigned char>> sin_agentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
-   list<Action> ruta_calculada = B_Anchura_Ingeniero(inicio, objetivo, mapaResultado, mapaCotas, sin_agentes);
-    
-   if (!ruta_calculada.empty()) return ruta_calculada.front();
-   return IDLE;
+Action NavegarHaciaDestinoI(Sensores &sensores, ubicacion objetivo, bool tiene_zapatillas, const vector<vector<unsigned char>> &mapaResultado, const vector<vector<unsigned char>> &mapaCotas, const vector<Paso> &plan, int idx_tecnico, list<Action> &ruta_nav, int &intentos_bloqueo) {
+   
+   if (ruta_nav.empty()) {
+      EstadoI inicio;
+      inicio.site.f = sensores.posF;
+      inicio.site.c = sensores.posC;
+      inicio.site.brujula = sensores.rumbo;
+      inicio.zapatillas = tiene_zapatillas;
+      
+      vector<vector<unsigned char>> mapa_agentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
+      
+      if (idx_tecnico >= 0 && idx_tecnico < plan.size()) {
+         mapa_agentes[plan[idx_tecnico].fil][plan[idx_tecnico].col] = 't';
+      }
+      
+      ruta_nav = B_Anchura_Ingeniero(inicio, objetivo, mapaResultado, mapaCotas, mapa_agentes);
+   }
+   
+   if (!ruta_nav.empty()) {
+      Action a = ruta_nav.front();
+      
+      bool colision = false;
+      if (a == WALK && sensores.agentes[2] != '_') colision = true;
+      if (a == JUMP && (sensores.agentes[2] != '_' || sensores.agentes[6] != '_')) colision = true;
+
+      if (colision) {
+         intentos_bloqueo++;
+         if (intentos_bloqueo > 3) {
+            ruta_nav.clear(); 
+            intentos_bloqueo = 0;
+         }
+         return IDLE;
+      }
+      
+      intentos_bloqueo = 0;
+      ruta_nav.pop_front();
+      return a;
+   }
+   
+   ruta_nav.clear();
+   return TURN_SR;
 }
 
 /**
@@ -766,7 +795,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
    ActualizarMapa(sensores);
    if (sensores.superficie[0] == 'D') zapatillas = true;
 
-   // FASE 0: Calcular el plan de tuberías al arrancar
+   // FASE 0: Calcular plan
    if (fase_actual == 0) {
       list<Paso> ruta_tuberias = Algoritmo_Tuberias(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, 99999);
       for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
@@ -774,34 +803,34 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
       indice_tramo = 0;
    }
 
-   // FASE 1: El ingeniero recorre la red ajustando las alturas (RAISE / DIG)
+   // FASE 1: Preparar terreno
    if (fase_actual == 1) {
-      // Buscar el siguiente tramo que necesita ser excavado o elevado
       while (indice_tramo < plan_construccion.size() && plan_construccion[indice_tramo].op == 0) {
          indice_tramo++;
       }
       
-      // Si ya preparó todo el terreno, pasamos a la fase de llamar al Técnico
       if (indice_tramo >= plan_construccion.size()) {
          fase_actual = 2; 
          indice_tramo = 0;
+         ruta_nav.clear();
          return IDLE;
       }
       
       Paso tramo_objetivo = plan_construccion[indice_tramo];
       if (sensores.posF == tramo_objetivo.fil && sensores.posC == tramo_objetivo.col) {
          Action accion_terreno = (tramo_objetivo.op == 1) ? RAISE : DIG;
-         plan_construccion[indice_tramo].op = 0; // Lo marcamos como completado
+         plan_construccion[indice_tramo].op = 0; 
+         ruta_nav.clear();
          return accion_terreno;
       } else {
          ubicacion posicion_destino; 
          posicion_destino.f = tramo_objetivo.fil; 
          posicion_destino.c = tramo_objetivo.col;
-         return NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas);
+         return NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, -1, ruta_nav, intentos_bloqueo);
       }
    }
 
-   // FASE 2: Posicionarse para empezar a poner tuberías y llamar al Técnico
+   // FASE 2: Posicionarse y avisar
    if (fase_actual == 2) {
       Paso casilla_tecnico = plan_construccion[0];
       Paso casilla_ingeniero = plan_construccion[1];
@@ -812,7 +841,8 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
          if (sensores.rumbo == orientacion_necesaria) {
             fase_actual = 3;
             indice_tramo = 0;
-            return COME; // ¡Llamamos al Técnico!
+            ruta_nav.clear();
+            return COME; // ¡Aquí sí se llama al Técnico!
          } else {
             return TURN_SL;
          }
@@ -820,13 +850,13 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
          ubicacion posicion_destino; 
          posicion_destino.f = casilla_ingeniero.fil; 
          posicion_destino.c = casilla_ingeniero.col;
-         return NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas);
+         return NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, 0, ruta_nav, intentos_bloqueo);
       }
    }
 
-   // FASE 3: Instalación sincronizada de la red
+   // FASE 3: Instalar
    if (fase_actual == 3) {
-      if (indice_tramo >= plan_construccion.size() - 1) return IDLE; // Red terminada
+      if (indice_tramo >= plan_construccion.size() - 1) return IDLE; 
 
       Paso casilla_tecnico = plan_construccion[indice_tramo];
       Paso casilla_ingeniero = plan_construccion[indice_tramo + 1];
@@ -835,12 +865,12 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
          Orientacion orientacion_necesaria = CalcularOrientacionHaciaObjetivoI(casilla_ingeniero.fil, casilla_ingeniero.col, casilla_tecnico.fil, casilla_tecnico.col);
          
          if (sensores.rumbo == orientacion_necesaria) {
-            // Sincronización: Sólo damos la orden si vemos al técnico justo enfrente
             if (sensores.enfrente) {
                indice_tramo++; 
+               ruta_nav.clear(); 
                return INSTALL;
             } else {
-               return IDLE; // Esperamos pacientemente a que el Técnico se coloque
+               return IDLE; 
             }
          } else {
             return TURN_SL;
@@ -849,7 +879,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
          ubicacion posicion_destino; 
          posicion_destino.f = casilla_ingeniero.fil; 
          posicion_destino.c = casilla_ingeniero.col;
-         return NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas);
+         return NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, indice_tramo, ruta_nav, intentos_bloqueo);
       }
    }
 

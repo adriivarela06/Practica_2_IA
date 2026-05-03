@@ -254,6 +254,8 @@ private:
    int fase_actual = 0;
    int indice_tramo = 0;
    vector<Paso> plan_construccion;
+   list<Action> ruta_nav;
+   int intentos_bloqueo = 0;
 };
 
 #endif
