@@ -545,13 +545,235 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_4(Sensores sensores) {
   return IDLE;
 }
 
+int CalcularEnergiaTuberiaT(unsigned char terreno, int op) {
+   int energia = 0;
+   
+   if (terreno == 'A') energia += 60;
+   else if (terreno == 'H') energia += 45;
+   else if (terreno == 'S') energia += 25;
+   else if (terreno == 'C' || terreno == 'U') energia += 15;
+   else energia += 30; 
+
+   if (op == 1) {
+      if (terreno == 'H') energia += 55;
+      else if (terreno == 'S') energia += 30;
+      else if (terreno == 'C' || terreno == 'U') energia += 10;
+      else energia += 40;
+   }
+   else if (op == -1) {
+      if (terreno == 'H') energia += 65;
+      else if (terreno == 'S') energia += 40;
+      else if (terreno == 'C' || terreno == 'U') energia += 25;
+      else energia += 50;
+   }
+   return energia;
+}
+
+int CalcularEcoTuberiaT(unsigned char terreno, int op) {
+   int eco = 0;
+    
+   if (terreno == 'A') eco += 50;
+   else if (terreno == 'H') eco += 55;
+   else if (terreno == 'S') eco += 25;
+   else if (terreno == 'C' || terreno == 'U') eco += 15;
+   else eco += 30;
+
+   if (op == 1) {
+      if (terreno == 'H') eco += 55;
+      else if (terreno == 'S') eco += 30;
+      else if (terreno == 'C' || terreno == 'U') eco += 10;
+      else eco += 40;
+   }
+   else if (op == -1) {
+      if (terreno == 'H') eco += 65;
+      else if (terreno == 'S') eco += 40;
+      else if (terreno == 'C' || terreno == 'U') eco += 25;
+      else eco += 50;
+   }
+   return eco;
+}
+
+list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia) {
+   priority_queue<NodoTuberiaT, vector<NodoTuberiaT>, greater<NodoTuberiaT>> frontier;
+   
+   int filas = terreno.size(),
+       cols = terreno[0].size();
+
+   map<PadreT, pair<int, int>> mejor_coste;
+   map<PadreT, PadreT> viene_de;
+
+   for (int i = -1; i <= 1; i++) {
+      unsigned char t_ini = terreno[inicio_f][inicio_c];
+         
+      if ((i == 0 || t_ini != 'A') && (i != 1 || altura[inicio_f][inicio_c] < 9) && (i != -1 || altura[inicio_f][inicio_c] > 1)) {
+         NodoTuberiaT inicial;
+         inicial.f = inicio_f;
+         inicial.c = inicio_c;
+         inicial.op = i;
+         inicial.altura_mod = altura[inicio_f][inicio_c] + i;
+         inicial.dist = 1;
+         inicial.energia = CalcularEnergiaTuberiaT(t_ini, i);
+         inicial.eco = CalcularEcoTuberiaT(t_ini, i);
+
+         if (inicial.energia <= max_energia) {
+            frontier.push(inicial);
+            mejor_coste[{inicio_f, inicio_c, i}] = {1, inicial.energia + inicial.eco};
+         }
+      }
+   }
+
+   int df[] = {-1, 1, 0, 0},
+       dc[] = {0, 0, 1, -1};
+
+   while (!frontier.empty()) {
+      NodoTuberiaT actual = frontier.top();
+      frontier.pop();
+
+      if (terreno[actual.f][actual.c] == 'U') {
+         list<Paso> camino_final;
+         PadreT curr = {actual.f, actual.c, actual.op};
+         
+         bool salida = false;
+         while (!salida) {
+            camino_final.push_front({curr.f, curr.c, curr.op});
+            if (viene_de.find(curr) == viene_de.end()) {
+               salida = true;
+            } else {
+               curr = viene_de[curr];
+            }
+         }
+
+         return camino_final;
+      }
+
+      for (int i = 0; i < 4; i++) {
+         int nf = actual.f + df[i],
+             nc = actual.c + dc[i];
+
+         if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
+            unsigned char t = terreno[nf][nc];
+                
+            if (t != 'M' && t != 'P') {
+               for (int nop = -1; nop <= 1; nop++) {
+                  if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {
+
+                     int nalt = altura[nf][nc] + nop,
+                         dif_alt = actual.altura_mod - nalt;
+
+                     if (dif_alt == 0 || dif_alt == 1) {
+                        int n_energia = actual.energia + CalcularEnergiaTuberiaT(t, nop);
+                        int n_eco = actual.eco + CalcularEcoTuberiaT(t, nop);
+                           
+                        if (n_energia <= max_energia) {
+                           pair<int, int> coste_hijo = {actual.dist + 1, n_energia + n_eco};
+                           PadreT estado_hijo = {nf, nc, nop};
+
+                           if (mejor_coste.find(estado_hijo) == mejor_coste.end() || coste_hijo < mejor_coste[estado_hijo]) {
+                              mejor_coste[estado_hijo] = coste_hijo;
+                              viene_de[estado_hijo] = {actual.f, actual.c, actual.op};
+                                 
+                              NodoTuberiaT hijo;
+                              hijo.f = nf;
+                              hijo.c = nc;
+                              hijo.op = nop;
+                              hijo.altura_mod = nalt;
+                              hijo.energia = n_energia;
+                              hijo.eco = n_eco;
+                              hijo.dist = actual.dist + 1;
+                                 
+                              frontier.push(hijo);
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   return {}; 
+}
+
+Orientacion CalcularOrientacionHaciaObjetivoT(int fila_origen, int col_origen, int fila_destino, int col_destino) {
+   if (fila_destino < fila_origen && col_destino == col_origen) return norte;
+   if (fila_destino > fila_origen && col_destino == col_origen) return sur;
+   if (fila_destino == fila_origen && col_destino < col_origen) return oeste;
+   if (fila_destino == fila_origen && col_destino > col_origen) return este;
+   return norte; 
+}
+
+Action NavegarHaciaDestinoT(Sensores &sensores, ubicacion objetivo, bool tiene_zapatillas, const vector<vector<unsigned char>> &mapaResultado, const vector<vector<unsigned char>> &mapaCotas) {
+   EstadoT inicio;
+   inicio.site.f = sensores.posF;
+   inicio.site.c = sensores.posC;
+   inicio.site.brujula = sensores.rumbo;
+   inicio.zapatillas = tiene_zapatillas;
+   
+   vector<vector<unsigned char>> sin_agentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
+   list<Action> ruta_calculada = A_Estrella_Tecnico(inicio, objetivo, mapaResultado, mapaCotas, sin_agentes);
+   
+   if (!ruta_calculada.empty()) return ruta_calculada.front();
+   return IDLE;
+}
+
 /**
  * @brief Comportamiento del técnico para el Nivel 5.
  * @param sensores Datos actuales de los sensores.
  * @return Acción a realizar.
  */
-Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores) {
-  return IDLE;
+Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
+{
+   ActualizarMapa(sensores);
+   if (sensores.superficie[0] == 'D') zapatillas = true;
+
+   // FASE 0: Calcular el plan de tuberías al arrancar (debe ser el mismo que el del ingeniero)
+   if (fase_actual == 0) {
+      list<Paso> ruta_tuberias = Algoritmo_Tuberias_Tecnico(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, 99999);
+      for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
+      fase_actual = 1;
+      indice_tramo = 0;
+   }
+
+   // FASE 1: Esperando la señal del ingeniero (COME -> activa el sensor venpaca)
+   if (fase_actual == 1) {
+      if (sensores.venpaca) {
+         fase_actual = 2; // ¡Luz verde, empieza la acción!
+      } else {
+         return IDLE;
+      }
+   }
+
+   // FASE 2: Instalación sincronizada
+   if (fase_actual == 2) {
+      if (indice_tramo >= plan_construccion.size() - 1) return IDLE; // Red terminada
+
+      Paso casilla_tecnico = plan_construccion[indice_tramo];
+      Paso casilla_ingeniero = plan_construccion[indice_tramo + 1];
+
+      if (sensores.posF == casilla_tecnico.fil && sensores.posC == casilla_tecnico.col) {
+         Orientacion orientacion_necesaria = CalcularOrientacionHaciaObjetivoT(casilla_tecnico.fil, casilla_tecnico.col, casilla_ingeniero.fil, casilla_ingeniero.col);
+         
+         if (sensores.rumbo == orientacion_necesaria) {
+            // Sincronización perfecta: Verificamos que miramos al Ingeniero
+            if (sensores.enfrente) {
+               indice_tramo++;
+               return INSTALL;
+            } else {
+               return IDLE; // Esperando a que el Ingeniero nos mire fijamente
+            }
+         } else {
+            return TURN_SL;
+         }
+      } else {
+         ubicacion posicion_destino; 
+         posicion_destino.f = casilla_tecnico.fil; 
+         posicion_destino.c = casilla_tecnico.col;
+         return NavegarHaciaDestinoT(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas);
+      }
+   }
+
+   return IDLE;
 }
 
 /**

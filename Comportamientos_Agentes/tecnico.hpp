@@ -51,6 +51,30 @@ struct NodoT {
    }
 };
 
+struct NodoTuberiaT {
+   int f, c;              
+   int altura_mod;        
+   int op;                
+   int energia;
+   int eco;       
+   int dist;      
+
+   bool operator>(const NodoTuberiaT &otro) const {
+      if (dist != otro.dist) return dist > otro.dist;
+      return (energia + eco) > (otro.energia + otro.eco);
+   }
+};
+
+struct PadreT {
+   int f, c, op;
+   
+   bool operator<(const PadreT& otro) const {
+      if (f != otro.f) return f < otro.f;
+      if (c != otro.c) return c < otro.c;
+      return op < otro.op;
+   }
+};
+
 struct ComparaNodosT {
     bool operator()(const NodoT& a, const NodoT& b) const {
         return (a.coste + a.heuristica) > (b.coste + b.heuristica);
@@ -238,6 +262,10 @@ private:
   list<Action> plan;
 
   vector<vector<unsigned char>> matrizAgentes;
+
+   int fase_actual = 0;
+   int indice_tramo = 0;
+   vector<Paso> plan_construccion;
 };
 
 #endif

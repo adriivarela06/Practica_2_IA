@@ -250,6 +250,10 @@ private:
    list<Action> plan;
 
    vector<vector<unsigned char>> matrizAgentes;
+
+   int fase_actual = 0;
+   int indice_tramo = 0;
+   vector<Paso> plan_construccion;
 };
 
 #endif
