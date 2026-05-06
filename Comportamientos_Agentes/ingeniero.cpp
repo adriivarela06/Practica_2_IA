@@ -887,74 +887,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_6(Sensores sensores)
 {
-    ActualizarMapa(sensores);
-    if (sensores.superficie[0] == 'D') zapatillas = true;
-
-    // 1. Comprobar si el plan actual se ha corrompido con el nuevo mapa descubierto
-    if (fase_actual > 0 && !plan_construccion.empty()) {
-        bool ruta_corrupta = false;
-        for (size_t i = indice_tramo; i < plan_construccion.size(); i++) {
-            unsigned char t = mapaResultado[plan_construccion[i].fil][plan_construccion[i].col];
-            // Si descubrimos que la ruta pasa por un obstáculo
-            if (t == 'M' || t == 'P' || t == 'B') {
-                ruta_corrupta = true;
-                break;
-            }
-            // Comprobar la gravedad de la tubería con las alturas descubiertas
-            if (i < plan_construccion.size() - 1) {
-                unsigned char t_next = mapaResultado[plan_construccion[i+1].fil][plan_construccion[i+1].col];
-                if (t != '?' && t_next != '?') {
-                    int alt_actual = mapaCotas[plan_construccion[i].fil][plan_construccion[i].col] + plan_construccion[i].op;
-                    int alt_sig = mapaCotas[plan_construccion[i+1].fil][plan_construccion[i+1].col] + plan_construccion[i+1].op;
-                    if (alt_actual - alt_sig != 0 && alt_actual - alt_sig != 1) {
-                        ruta_corrupta = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // Si la ruta ya no es viable o nos hemos atascado navegando sin encontrar camino
-        if (ruta_corrupta || intentos_bloqueo > 5) {
-            fase_actual = 0;
-            plan_construccion.clear();
-            ruta_nav.clear();
-            intentos_bloqueo = 0;
-        }
-    }
-
-    // 2. Si no hay plan (fase 0), intentamos generarlo. Si no se puede, ¡a explorar!
-    if (fase_actual == 0) {
-        int eco_disponible = sensores.max_ecologico - sensores.ecologico;
-        list<Paso> ruta_tuberias = Algoritmo_Tuberias_Ingeniero(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, sensores.energia, eco_disponible);
-
-        bool plan_valido = false;
-        if (!ruta_tuberias.empty()) {
-            Paso ultimo = ruta_tuberias.back();
-            // Comprobamos si el planificador logró encontrar una ruta hasta una planta 'U' conocida
-            if (mapaResultado[ultimo.fil][ultimo.col] == 'U') {
-                plan_valido = true;
-            }
-        }
-
-        if (!plan_valido || ruta_tuberias.size() < 2) {
-            // No hemos descubierto suficiente mapa para crear una red de tuberías. Usamos reactivo.
-            return ComportamientoIngenieroNivel_1(sensores);
-        } else {
-            // ¡Hemos encontrado un plan! Inicializamos variables para empezar a construir.
-            plan_construccion.clear();
-            for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
-            fase_actual = 1;
-            indice_tramo = 0;
-            ruta_nav.clear();
-            intentos_bloqueo = 0;
-            VisualizaRedTuberias(ruta_tuberias);
-        }
-    }
-
-    // 3. Si tenemos un plan viable, pasamos el control a tu Nivel 5 para construirlo.
-    // Como fase_actual es > 0, el Nivel 5 saltará la planificación e irá directo a la acción.
-    return ComportamientoIngenieroNivel_5(sensores);
+   return IDLE;
 }
 
 // =========================================================================

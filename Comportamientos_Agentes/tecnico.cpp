@@ -804,64 +804,7 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_6(Sensores sensores)
 {
-    ActualizarMapa(sensores);
-    if (sensores.superficie[0] == 'D') zapatillas = true;
-
-    if (fase_actual > 0 && !plan_construccion.empty()) {
-        bool ruta_corrupta = false;
-        for (size_t i = indice_tramo; i < plan_construccion.size(); i++) {
-            unsigned char t = mapaResultado[plan_construccion[i].fil][plan_construccion[i].col];
-            if (t == 'M' || t == 'P' || t == 'B') {
-                ruta_corrupta = true;
-                break;
-            }
-            if (i < plan_construccion.size() - 1) {
-                unsigned char t_next = mapaResultado[plan_construccion[i+1].fil][plan_construccion[i+1].col];
-                if (t != '?' && t_next != '?') {
-                    int alt_actual = mapaCotas[plan_construccion[i].fil][plan_construccion[i].col] + plan_construccion[i].op;
-                    int alt_sig = mapaCotas[plan_construccion[i+1].fil][plan_construccion[i+1].col] + plan_construccion[i+1].op;
-                    if (alt_actual - alt_sig != 0 && alt_actual - alt_sig != 1) {
-                        ruta_corrupta = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (ruta_corrupta || intentos_bloqueo > 5) {
-            fase_actual = 0;
-            plan_construccion.clear();
-            ruta_nav.clear();
-            intentos_bloqueo = 0;
-        }
-    }
-
-    if (fase_actual == 0) {
-        int eco_disponible = sensores.max_ecologico - sensores.ecologico;
-        list<Paso> ruta_tuberias = Algoritmo_Tuberias_Tecnico(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, sensores.energia, eco_disponible);
-
-        bool plan_valido = false;
-        if (!ruta_tuberias.empty()) {
-            Paso ultimo = ruta_tuberias.back();
-            if (mapaResultado[ultimo.fil][ultimo.col] == 'U') {
-                plan_valido = true;
-            }
-        }
-
-        if (!plan_valido || ruta_tuberias.size() < 2) {
-            return ComportamientoTecnicoNivel_1(sensores);
-        } else {
-            plan_construccion.clear();
-            for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
-            fase_actual = 1;
-            indice_tramo = 0;
-            ruta_nav.clear();
-            intentos_bloqueo = 0;
-        }
-    }
-
-    // Igual que el Ingeniero, delega la construcción en tu lógica robusta del Nivel 5
-    return ComportamientoTecnicoNivel_5(sensores);
+   return IDLE;
 }
 
 
