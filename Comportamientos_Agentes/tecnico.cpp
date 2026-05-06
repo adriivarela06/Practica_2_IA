@@ -653,7 +653,8 @@ list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<v
          if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
                 
-            if (t != 'M' && t != 'P') {
+            // CORRECCIÓN AQUÍ: Evitamos también el bosque ('B')
+            if (t != 'M' && t != 'P' && t != 'B') {
                for (int nop = -1; nop <= 1; nop++) {
                   if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {
 
@@ -758,6 +759,10 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
    // FASE 0: Calcular plan
    if (fase_actual == 0) {
       list<Paso> ruta_tuberias = Algoritmo_Tuberias_Tecnico(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, 99999);
+      
+      // Validación de seguridad por si no hay ruta posible
+      if (ruta_tuberias.size() < 2) return IDLE;
+      
       for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
       fase_actual = 1;
       indice_tramo = 0;
