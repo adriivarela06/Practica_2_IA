@@ -559,7 +559,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores
    return accion;
 }
 
-int CalcularEnergiaTuberia(unsigned char terreno, int op) {
+int CalcularEnergiaTuberiaI(unsigned char terreno, int op) {
    int energia = 0;
    
    if (terreno == 'A') energia += 60;
@@ -583,11 +583,11 @@ int CalcularEnergiaTuberia(unsigned char terreno, int op) {
    return energia;
 }
 
-int CalcularEcoTuberia(unsigned char terreno, int op) {
+int CalcularEcoTuberiaI(unsigned char terreno, int op) {
    int eco = 0;
     
    if (terreno == 'A') eco += 50;
-   else if (terreno == 'H') eco += 55;
+   else if (terreno == 'H') eco += 45;
    else if (terreno == 'S') eco += 25;
    else if (terreno == 'C' || terreno == 'U') eco += 15;
    else eco += 30;
@@ -607,37 +607,34 @@ int CalcularEcoTuberia(unsigned char terreno, int op) {
    return eco;
 }
 
-list<Paso> Algoritmo_Tuberias(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia) {
+list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia, int max_eco) {
    priority_queue<NodoTuberia, vector<NodoTuberia>, greater<NodoTuberia>> frontier;
-   
-   int filas = terreno.size(),
-       cols = terreno[0].size();
+   int filas = terreno.size(), cols = terreno[0].size();
 
-   map<Padre, pair<int, int>> mejor_coste;
+   map<Padre, int> mejor_coste; 
    map<Padre, Padre> viene_de;
 
    for (int i = -1; i <= 1; i++) {
       unsigned char t_ini = terreno[inicio_f][inicio_c];
-         
       if ((i == 0 || t_ini != 'A') && (i != 1 || altura[inicio_f][inicio_c] < 9) && (i != -1 || altura[inicio_f][inicio_c] > 1)) {
          NodoTuberia inicial;
-         inicial.f = inicio_f;
-         inicial.c = inicio_c;
-         inicial.op = i;
-         inicial.altura_mod = altura[inicio_f][inicio_c] + i;
-         inicial.dist = 1;
-         inicial.energia = CalcularEnergiaTuberia(t_ini, i);
-         inicial.eco = CalcularEcoTuberia(t_ini, i);
+         inicial.f = inicio_f; inicial.c = inicio_c; inicial.op = i;
+         inicial.altura_mod = altura[inicio_f][inicio_c] + i; inicial.dist = 1;
+         
+         // REGLA 2: Coste de DIG/RAISE en casilla inicial (no se cobra el coste base de INSTALL)
+         int coste_base_ene = CalcularEnergiaTuberiaI(t_ini, 0);
+         int coste_base_eco = CalcularEcoTuberiaI(t_ini, 0);
+         inicial.energia = CalcularEnergiaTuberiaI(t_ini, i) - coste_base_ene;
+         inicial.eco = CalcularEcoTuberiaI(t_ini, i) - coste_base_eco;
 
-         if (inicial.energia <= max_energia) {
+         if (inicial.energia <= max_energia && inicial.eco <= max_eco) {
             frontier.push(inicial);
-            mejor_coste[{inicio_f, inicio_c, i}] = {1, inicial.energia + inicial.eco};
+            mejor_coste[{inicio_f, inicio_c, i}] = inicial.energia + inicial.eco;
          }
       }
    }
 
-   int df[] = {-1, 1, 0, 0},
-       dc[] = {0, 0, 1, -1};
+   int df[] = {-1, 1, 0, 0}, dc[] = {0, 0, 1, -1};
 
    while (!frontier.empty()) {
       NodoTuberia actual = frontier.top();
@@ -646,56 +643,39 @@ list<Paso> Algoritmo_Tuberias(int inicio_f, int inicio_c, const vector<vector<un
       if (terreno[actual.f][actual.c] == 'U') {
          list<Paso> camino_final;
          Padre curr = {actual.f, actual.c, actual.op};
-         
          bool salida = false;
          while (!salida) {
             camino_final.push_front({curr.f, curr.c, curr.op});
-            if (viene_de.find(curr) == viene_de.end()) {
-               salida = true;
-            } else {
-               curr = viene_de[curr];
-            }
+            if (viene_de.find(curr) == viene_de.end()) salida = true;
+            else curr = viene_de[curr];
          }
-
          return camino_final;
       }
 
       for (int i = 0; i < 4; i++) {
-         int nf = actual.f + df[i],
-             nc = actual.c + dc[i];
-
+         int nf = actual.f + df[i], nc = actual.c + dc[i];
          if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
-            
-            // CORRECCIÓN AQUÍ: Evitamos también el bosque ('B')
             if (t != 'M' && t != 'P' && t != 'B') {
                for (int nop = -1; nop <= 1; nop++) {
                   if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {
-
-                     int nalt = altura[nf][nc] + nop,
-                         dif_alt = actual.altura_mod - nalt;
-
+                     int nalt = altura[nf][nc] + nop, dif_alt = actual.altura_mod - nalt;
                      if (dif_alt == 0 || dif_alt == 1) {
-                        int n_energia = actual.energia + CalcularEnergiaTuberia(t, nop);
-                        int n_eco = actual.eco + CalcularEcoTuberia(t, nop);
+                        int n_energia = actual.energia + CalcularEnergiaTuberiaI(t, nop);
+                        
+                        // REGLA 1: El impacto ecológico del install se cuenta en la casilla actual y en la siguiente
+                        int eco_inst_actual = CalcularEcoTuberiaI(terreno[actual.f][actual.c], 0);
+                        int n_eco = actual.eco + eco_inst_actual + CalcularEcoTuberiaI(t, nop);
                            
-                        if (n_energia <= max_energia) {
-                           pair<int, int> coste_hijo = {actual.dist + 1, n_energia + n_eco};
+                        if (n_energia <= max_energia && n_eco <= max_eco) {
+                           int coste_recursos = n_energia + n_eco;
                            Padre estado_hijo = {nf, nc, nop};
-
-                           if (mejor_coste.find(estado_hijo) == mejor_coste.end() || coste_hijo < mejor_coste[estado_hijo]) {
-                              mejor_coste[estado_hijo] = coste_hijo;
+                           if (mejor_coste.find(estado_hijo) == mejor_coste.end() || coste_recursos < mejor_coste[estado_hijo]) {
+                              mejor_coste[estado_hijo] = coste_recursos;
                               viene_de[estado_hijo] = {actual.f, actual.c, actual.op};
-                                 
                               NodoTuberia hijo;
-                              hijo.f = nf;
-                              hijo.c = nc;
-                              hijo.op = nop;
-                              hijo.altura_mod = nalt;
-                              hijo.energia = n_energia;
-                              hijo.eco = n_eco;
-                              hijo.dist = actual.dist + 1;
-                                 
+                              hijo.f = nf; hijo.c = nc; hijo.op = nop; hijo.altura_mod = nalt;
+                              hijo.energia = n_energia; hijo.eco = n_eco; hijo.dist = actual.dist + 1;
                               frontier.push(hijo);
                            }
                         }
@@ -719,12 +699,15 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_4(Sensores sensores
 {
    if (hayPlan) return IDLE;
 
-   list<Paso> plan_tuberias = Algoritmo_Tuberias(
+   int eco_disponible = sensores.max_ecologico - sensores.ecologico;
+
+   list<Paso> plan_tuberias = Algoritmo_Tuberias_Ingeniero(
       sensores.BelPosF, 
       sensores.BelPosC, 
       mapaResultado, 
       mapaCotas,
-      sensores.energia
+      sensores.energia,
+      eco_disponible
    );
 
    if (!plan_tuberias.empty()) {
@@ -744,35 +727,38 @@ Orientacion CalcularOrientacionHaciaObjetivoI(int fila_origen, int col_origen, i
 }
 
 Action NavegarHaciaDestinoI(Sensores &sensores, ubicacion objetivo, bool tiene_zapatillas, const vector<vector<unsigned char>> &mapaResultado, const vector<vector<unsigned char>> &mapaCotas, const vector<Paso> &plan, int idx_tecnico, list<Action> &ruta_nav, int &intentos_bloqueo) {
-   
    if (ruta_nav.empty()) {
       EstadoI inicio;
-      inicio.site.f = sensores.posF;
-      inicio.site.c = sensores.posC;
-      inicio.site.brujula = sensores.rumbo;
-      inicio.zapatillas = tiene_zapatillas;
-      
+      inicio.site.f = sensores.posF; inicio.site.c = sensores.posC; inicio.site.brujula = sensores.rumbo; inicio.zapatillas = tiene_zapatillas;
       vector<vector<unsigned char>> mapa_agentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
-      
       if (idx_tecnico >= 0 && idx_tecnico < plan.size()) {
          mapa_agentes[plan[idx_tecnico].fil][plan[idx_tecnico].col] = 't';
       }
-      
       ruta_nav = B_Anchura_Ingeniero(inicio, objetivo, mapaResultado, mapaCotas, mapa_agentes);
    }
    
    if (!ruta_nav.empty()) {
       Action a = ruta_nav.front();
-      
       bool colision = false;
-      if (a == WALK && sensores.agentes[2] != '_') colision = true;
-      if (a == JUMP && (sensores.agentes[2] != '_' || sensores.agentes[6] != '_')) colision = true;
+      int max_dif = tiene_zapatillas ? 2 : 1;
+
+      if (a == WALK) {
+         if (sensores.agentes[2] != '_') colision = true;
+         if (abs(sensores.cota[2] - sensores.cota[0]) > max_dif) {
+             ruta_nav.clear(); return IDLE;
+         }
+      }
+      else if (a == JUMP) {
+         if (sensores.agentes[2] != '_' || sensores.agentes[6] != '_') colision = true;
+         if (abs(sensores.cota[6] - sensores.cota[0]) > max_dif) {
+             ruta_nav.clear(); return IDLE;
+         }
+      }
 
       if (colision) {
          intentos_bloqueo++;
          if (intentos_bloqueo > 3) {
-            ruta_nav.clear(); 
-            intentos_bloqueo = 0;
+            ruta_nav.clear(); intentos_bloqueo = 0;
          }
          return IDLE;
       }
@@ -781,7 +767,6 @@ Action NavegarHaciaDestinoI(Sensores &sensores, ubicacion objetivo, bool tiene_z
       ruta_nav.pop_front();
       return a;
    }
-   
    ruta_nav.clear();
    return TURN_SR;
 }
@@ -796,11 +781,11 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
    ActualizarMapa(sensores);
    if (sensores.superficie[0] == 'D') zapatillas = true;
 
-   // FASE 0: Calcular plan
    if (fase_actual == 0) {
-      list<Paso> ruta_tuberias = Algoritmo_Tuberias(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, 99999);
+      int eco_disponible = sensores.max_ecologico - sensores.ecologico;
+
+      list<Paso> ruta_tuberias = Algoritmo_Tuberias_Ingeniero(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, sensores.energia, eco_disponible);
       
-      // Validación de seguridad por si no hay ruta posible
       if (ruta_tuberias.size() < 2) return IDLE;
       
       for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
@@ -808,7 +793,6 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
       indice_tramo = 0;
    }
 
-   // FASE 1: Preparar terreno
    if (fase_actual == 1) {
       while (indice_tramo < plan_construccion.size() && plan_construccion[indice_tramo].op == 0) {
          indice_tramo++;
@@ -835,9 +819,8 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
       }
    }
 
-   // FASE 2: Posicionarse y avisar
    if (fase_actual == 2) {
-      if (plan_construccion.size() < 2) return IDLE; // Seguridad extra
+      if (plan_construccion.size() < 2) return IDLE; 
       
       Paso casilla_tecnico = plan_construccion[0];
       Paso casilla_ingeniero = plan_construccion[1];
@@ -849,7 +832,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
             fase_actual = 3;
             indice_tramo = 0;
             ruta_nav.clear();
-            return COME; // ¡Aquí sí se llama al Técnico!
+            return COME;
          } else {
             return TURN_SL;
          }
@@ -861,7 +844,6 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
       }
    }
 
-   // FASE 3: Instalar
    if (fase_actual == 3) {
       if (indice_tramo >= plan_construccion.size() - 1) return IDLE; 
 
