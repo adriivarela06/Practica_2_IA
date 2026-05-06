@@ -338,7 +338,7 @@ bool EsMovimientoLegalT(Action accion, const EstadoT &st, const vector<vector<un
       return false;
 
    unsigned char t = terreno[destino.f][destino.c];
-   // PROTECCIÓN NIVEL 6: Se añade t == '?'
+
    if (t == 'M' || t == 'P' || t == '?') return false;
    if (t == 'B' && !st.zapatillas) return false;
 
@@ -515,24 +515,23 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
    }
 
    if (hayPlan && !plan.empty()) {
-    Action a = plan.front();
-    bool choque = false;
-    ubicacion actual = {sensores.posF, sensores.posC, sensores.rumbo};
+      Action a = plan.front();
+      bool choque = false;
+      ubicacion actual = {sensores.posF, sensores.posC, sensores.rumbo};
 
-    if (a == WALK && sensores.agentes[2] != '_')
-        choque = true;
+      if (a == WALK && sensores.agentes[2] != '_')
+         choque = true;
 
-    if (choque) {
-        accion = IDLE;
-    } else {
-        accion = plan.front();
-        plan.pop_front();
-    }
-}
-   
-   if (plan.empty()) {
-      hayPlan = false;
+      if (choque)
+         accion = IDLE;
+      else {
+         accion = plan.front();
+         plan.pop_front();
+      }
    }
+   
+   if (plan.empty())
+      hayPlan = false;
 
    return accion;
 }
@@ -632,7 +631,7 @@ list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<v
          int nf = actual.f + df[i], nc = actual.c + dc[i];
          if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
-            // PROTECCIÓN NIVEL 6: Se añade t != '?'
+            // PROTECCIÓN NIVEL 6
             if (t != 'M' && t != 'P' && t != 'B' && t != '?') {
                for (int nop = -1; nop <= 1; nop++) {
                   if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {
@@ -682,9 +681,9 @@ Action NavegarHaciaDestinoT(Sensores &sensores, ubicacion objetivo, bool tiene_z
       EstadoT inicio;
       inicio.site.f = sensores.posF; inicio.site.c = sensores.posC; inicio.site.brujula = sensores.rumbo; inicio.zapatillas = tiene_zapatillas;
       vector<vector<unsigned char>> mapa_agentes(mapaResultado.size(), vector<unsigned char>(mapaResultado[0].size(), '_'));
-      if (idx_ingeniero >= 0 && idx_ingeniero < plan.size()) {
+      if (idx_ingeniero >= 0 && idx_ingeniero < plan.size())
          mapa_agentes[plan[idx_ingeniero].fil][plan[idx_ingeniero].col] = 'i';
-      }
+
       ruta_nav = A_Estrella_Tecnico(inicio, objetivo, mapaResultado, mapaCotas, mapa_agentes);
    }
    
@@ -694,16 +693,16 @@ Action NavegarHaciaDestinoT(Sensores &sensores, ubicacion objetivo, bool tiene_z
 
       if (a == WALK) {
          if (sensores.agentes[2] != '_') colision = true;
-         if (abs(sensores.cota[2] - sensores.cota[0]) > 1) {
-             ruta_nav.clear(); return IDLE;
-         }
+         if (abs(sensores.cota[2] - sensores.cota[0]) > 1) 
+            ruta_nav.clear(); return IDLE;
+         
       }
 
       if (colision) {
          intentos_bloqueo++;
-         if (intentos_bloqueo > 3) {
+         if (intentos_bloqueo > 3)
             ruta_nav.clear(); intentos_bloqueo = 0;
-         }
+
          return IDLE;
       }
       
@@ -734,19 +733,23 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
       
       if (ruta_tuberias.size() < 2) return IDLE;
       
-      for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
+      for (auto tramo : ruta_tuberias) 
+         plan_construccion.push_back(tramo);
+
       fase_actual = 1;
       indice_tramo = 0;
    }
 
    if (fase_actual == 1) {
-      if (sensores.venpaca) {
+      if (sensores.venpaca)
          fase_actual = 2; 
-      } else {
-         bool ingenieroCerca = false;
-         for (int i = 1; i <= 8; i++) {
-            if (sensores.agentes[i] == 'i') {
-               ingenieroCerca = true; break;
+      else {
+         bool ingenieroCerca = false,
+              salida = false;
+         for (int i = 1; i <= 8 && !salida; i++) {
+            if (sensores.agentes[i] == 'i'){
+               ingenieroCerca = true; 
+               salida = true;
             }
          }
          if (ingenieroCerca) {
@@ -755,9 +758,8 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
                (sensores.superficie[2] != 'B' || zapatillas) && 
                 sensores.agentes[2] == '_' && dif_altura <= 1) {
                return WALK;
-            } else {
+            } else
                return TURN_SL;
-            }
          }
          return IDLE;
       }
@@ -777,12 +779,10 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
                indice_tramo++;
                ruta_nav.clear();
                return INSTALL;
-            } else {
+            } else
                return IDLE; 
-            }
-         } else {
+         } else
             return TURN_SL;
-         }
       } else {
          ubicacion posicion_destino; 
          posicion_destino.f = casilla_tecnico.fil; 
@@ -804,22 +804,24 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_6(Sensores sensores)
    ActualizarMapa(sensores);
    if (sensores.superficie[0] == 'D') zapatillas = true;
 
-   // FASE 0: Exploración libre
    if (fase_actual == 0) {
-      bool conozco_U = false;
+      bool conozco_U = false,
+           salida = false;
       if(mapaResultado.size() > 0 && mapaResultado[0].size() > 0) {
-         for(int i=0; i<mapaResultado.size(); i++){
-            for(int j=0; j<mapaResultado[0].size(); j++){
-               if(mapaResultado[i][j] == 'U') { conozco_U = true; break; }
+         for(int i=0; i<mapaResultado.size() && !salida; i++){
+            for(int j=0; j<mapaResultado[0].size() && !salida; j++){
+               if(mapaResultado[i][j] == 'U') { 
+                  conozco_U = true; 
+                  salida = true; 
+               }
             }
-            if(conozco_U) break;
+            if(conozco_U) salida = true;
          }
       }
 
-      // LA CLAVE QUE EVITA EL SEGFAULT
       bool conozco_Belkanita = (sensores.BelPosF != -1 && sensores.BelPosC != -1);
 
-      static int ciclos_expl_t = 0;
+      int ciclos_expl_t = 0;
       ciclos_expl_t++;
 
       if (conozco_U && conozco_Belkanita && (ciclos_expl_t % 15 == 0)) {
@@ -839,21 +841,16 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_6(Sensores sensores)
       return ComportamientoTecnicoNivel_1(sensores);
    }
 
-   // FASE 1: Esperando llamada
    if (fase_actual == 1) {
-      if (sensores.venpaca) {
+      if (sensores.venpaca)
          fase_actual = 2; 
-      } else {
+      else
          return ComportamientoTecnicoNivel_1(sensores); 
-      }
    }
 
-   // FASE 2: Instalación del Técnico
    if (fase_actual == 2) {
-      // PROTECCIÓN CLAVE: empty() y (int)
-      if (plan_construccion.empty() || indice_tramo >= (int)plan_construccion.size() - 1) {
+      if (plan_construccion.empty() || indice_tramo >= (int)plan_construccion.size() - 1)
          fase_actual = 0; plan_construccion.clear(); return IDLE; 
-      }
 
       Paso casilla_tecnico = plan_construccion[indice_tramo];
       Paso casilla_ingeniero = plan_construccion[indice_tramo + 1];
@@ -866,30 +863,25 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_6(Sensores sensores)
                indice_tramo++;
                ruta_nav.clear();
                return INSTALL;
-            } else {
+            } else
                return IDLE; 
-            }
-         } else {
+         } else
             return TURN_SL;
-         }
       } else {
          ubicacion posicion_destino; 
          posicion_destino.f = casilla_tecnico.fil; 
          posicion_destino.c = casilla_tecnico.col;
          Action act = NavegarHaciaDestinoT(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, indice_tramo + 1, ruta_nav, intentos_bloqueo);
          
-         if (intentos_bloqueo > 3 || (act == TURN_SR && ruta_nav.empty() && intentos_bloqueo > 0)) {
+         if (intentos_bloqueo > 3 || (act == TURN_SR && ruta_nav.empty() && intentos_bloqueo > 0))
             fase_actual = 0; plan_construccion.clear(); ruta_nav.clear(); intentos_bloqueo = 0;
-         }
+
          return act;
       }
    }
 
    return IDLE;
 }
-
-
-
 
 // =========================================================================
 // FUNCIONES PROPORCIONADAS
