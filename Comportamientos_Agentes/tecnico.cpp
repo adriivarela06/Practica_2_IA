@@ -338,7 +338,8 @@ bool EsMovimientoLegalT(Action accion, const EstadoT &st, const vector<vector<un
       return false;
 
    unsigned char t = terreno[destino.f][destino.c];
-   if (t == 'M' || t == 'P') return false;
+   // PROTECCIÓN NIVEL 6: Se añade t == '?'
+   if (t == 'M' || t == 'P' || t == '?') return false;
    if (t == 'B' && !st.zapatillas) return false;
 
    if (agentes[destino.f][destino.c] != '_') return false;
@@ -596,7 +597,6 @@ int CalcularEcoTuberiaT(unsigned char terreno, int op) {
 list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia, int max_eco) {
    priority_queue<NodoTuberiaT, vector<NodoTuberiaT>, greater<NodoTuberiaT>> frontier;
    int filas = terreno.size(), cols = terreno[0].size();
-
    map<PadreT, int> min_eco_visto; 
 
    for (int i = -1; i <= 1; i++) {
@@ -626,15 +626,14 @@ list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<v
       NodoTuberiaT actual = frontier.top();
       frontier.pop();
 
-      if (terreno[actual.f][actual.c] == 'U') {
-         return actual.camino;
-      }
+      if (terreno[actual.f][actual.c] == 'U') return actual.camino;
 
       for (int i = 0; i < 4; i++) {
          int nf = actual.f + df[i], nc = actual.c + dc[i];
          if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
-            if (t != 'M' && t != 'P' && t != 'B') {
+            // PROTECCIÓN NIVEL 6: Se añade t != '?'
+            if (t != 'M' && t != 'P' && t != 'B' && t != '?') {
                for (int nop = -1; nop <= 1; nop++) {
                   if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {
                      int nalt = altura[nf][nc] + nop;
@@ -647,7 +646,6 @@ list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<v
                         
                         if (n_energia <= max_energia && n_eco <= max_eco) {
                            PadreT estado_hijo = {nf, nc, nop};
-                           
                            if (min_eco_visto.find(estado_hijo) == min_eco_visto.end() || n_eco < min_eco_visto[estado_hijo]) {
                               min_eco_visto[estado_hijo] = n_eco;
                               
@@ -658,7 +656,6 @@ list<Paso> Algoritmo_Tuberias_Tecnico(int inicio_f, int inicio_c, const vector<v
                               hijo.dist = actual.dist + 1;
                               hijo.camino = actual.camino; 
                               hijo.camino.push_back({nf, nc, nop}); 
-                              
                               frontier.push(hijo);
                            }
                         }
@@ -804,6 +801,90 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_5(Sensores sensores)
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_6(Sensores sensores)
 {
+   ActualizarMapa(sensores);
+   if (sensores.superficie[0] == 'D') zapatillas = true;
+
+   // FASE 0: Exploración libre
+   if (fase_actual == 0) {
+      bool conozco_U = false;
+      if(mapaResultado.size() > 0 && mapaResultado[0].size() > 0) {
+         for(int i=0; i<mapaResultado.size(); i++){
+            for(int j=0; j<mapaResultado[0].size(); j++){
+               if(mapaResultado[i][j] == 'U') { conozco_U = true; break; }
+            }
+            if(conozco_U) break;
+         }
+      }
+
+      // LA CLAVE QUE EVITA EL SEGFAULT
+      bool conozco_Belkanita = (sensores.BelPosF != -1 && sensores.BelPosC != -1);
+
+      static int ciclos_expl_t = 0;
+      ciclos_expl_t++;
+
+      if (conozco_U && conozco_Belkanita && (ciclos_expl_t % 15 == 0)) {
+         int eco_disponible = sensores.max_ecologico - sensores.ecologico;
+         list<Paso> ruta_tuberias = Algoritmo_Tuberias_Tecnico(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, sensores.energia, eco_disponible);
+         
+         if (ruta_tuberias.size() >= 2) {
+            plan_construccion.clear();
+            for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
+            fase_actual = 1; 
+            indice_tramo = 0;
+            ruta_nav.clear();
+            intentos_bloqueo = 0;
+            return IDLE;
+         }
+      }
+      return ComportamientoTecnicoNivel_1(sensores);
+   }
+
+   // FASE 1: Esperando llamada
+   if (fase_actual == 1) {
+      if (sensores.venpaca) {
+         fase_actual = 2; 
+      } else {
+         return ComportamientoTecnicoNivel_1(sensores); 
+      }
+   }
+
+   // FASE 2: Instalación del Técnico
+   if (fase_actual == 2) {
+      // PROTECCIÓN CLAVE: empty() y (int)
+      if (plan_construccion.empty() || indice_tramo >= (int)plan_construccion.size() - 1) {
+         fase_actual = 0; plan_construccion.clear(); return IDLE; 
+      }
+
+      Paso casilla_tecnico = plan_construccion[indice_tramo];
+      Paso casilla_ingeniero = plan_construccion[indice_tramo + 1];
+
+      if (sensores.posF == casilla_tecnico.fil && sensores.posC == casilla_tecnico.col) {
+         Orientacion orientacion_necesaria = CalcularOrientacionHaciaObjetivoT(casilla_tecnico.fil, casilla_tecnico.col, casilla_ingeniero.fil, casilla_ingeniero.col);
+         
+         if (sensores.rumbo == orientacion_necesaria) {
+            if (sensores.enfrente) {
+               indice_tramo++;
+               ruta_nav.clear();
+               return INSTALL;
+            } else {
+               return IDLE; 
+            }
+         } else {
+            return TURN_SL;
+         }
+      } else {
+         ubicacion posicion_destino; 
+         posicion_destino.f = casilla_tecnico.fil; 
+         posicion_destino.c = casilla_tecnico.col;
+         Action act = NavegarHaciaDestinoT(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, indice_tramo + 1, ruta_nav, intentos_bloqueo);
+         
+         if (intentos_bloqueo > 3 || (act == TURN_SR && ruta_nav.empty() && intentos_bloqueo > 0)) {
+            fase_actual = 0; plan_construccion.clear(); ruta_nav.clear(); intentos_bloqueo = 0;
+         }
+         return act;
+      }
+   }
+
    return IDLE;
 }
 

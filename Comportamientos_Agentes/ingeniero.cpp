@@ -363,9 +363,7 @@ bool EsMovimientoLegalI(Action accion, const EstadoI &st, const vector<vector<un
    
    if (accion == WALK) {
       destino = SiguienteCasillaI(origen, 1);
- 
       if (destino.f < 0 || destino.f >= terreno.size() || destino.c < 0 || destino.c >= terreno[0].size()) return false;
- 
       if (agentes[destino.f][destino.c] != '_') return false; 
    }
    else if (accion == JUMP) {
@@ -375,7 +373,8 @@ bool EsMovimientoLegalI(Action accion, const EstadoI &st, const vector<vector<un
       if (intermedia.f < 0 || intermedia.f >= (int)terreno.size() || intermedia.c < 0 || intermedia.c >= (int)terreno[0].size()) return false;
       
       unsigned char terr_int = terreno[intermedia.f][intermedia.c];
-      if (terr_int == 'M' || terr_int == 'P' || terr_int == 'B') return false;
+      // PROTECCIÓN NIVEL 6: Se añade && terr_int != '?'
+      if (terr_int == 'M' || terr_int == 'P' || terr_int == 'B' || terr_int == '?') return false;
       if (agentes[intermedia.f][intermedia.c] != '_') return false; 
    } else
       return false;
@@ -383,18 +382,14 @@ bool EsMovimientoLegalI(Action accion, const EstadoI &st, const vector<vector<un
    if (destino.f < 0 || destino.f >= terreno.size() || destino.c < 0 || destino.c >= terreno[0].size()) return false;
  
    unsigned char terr_dest = terreno[destino.f][destino.c];
-   if (terr_dest == 'M' || terr_dest == 'P' || terr_dest == 'B') return false;
+   // PROTECCIÓN NIVEL 6: Se añade && terr_dest != '?'
+   if (terr_dest == 'M' || terr_dest == 'P' || terr_dest == 'B' || terr_dest == '?') return false;
  
    int alt_origen = altura[origen.f][origen.c];
    int alt_dest = altura[destino.f][destino.c];
    int dif_altura = abs(alt_dest - alt_origen);
    
-   int dif_maxima;
-   if (st.zapatillas == true)
-      dif_maxima = 2;
-   else
-      dif_maxima = 1;
-   
+   int dif_maxima = st.zapatillas ? 2 : 1;
    
    if (dif_altura > dif_maxima) return false;
  
@@ -610,9 +605,6 @@ int CalcularEcoTuberiaI(unsigned char terreno, int op) {
 list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector<vector<unsigned char>> &terreno, const vector<vector<unsigned char>> &altura, int max_energia, int max_eco) {
    priority_queue<NodoTuberiaI, vector<NodoTuberiaI>, greater<NodoTuberiaI>> frontier;
    int filas = terreno.size(), cols = terreno[0].size();
-
-   // Solo necesitamos rastrear el impacto ecológico mínimo visto para cada estado
-   // para no descartar rutas viables.
    map<Padre, int> min_eco_visto; 
 
    for (int i = -1; i <= 1; i++) {
@@ -642,7 +634,6 @@ list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector
       NodoTuberiaI actual = frontier.top();
       frontier.pop();
 
-      // Si llegamos a la meta, devolvemos su camino intacto directamente
       if (terreno[actual.f][actual.c] == 'U') {
          return actual.camino;
       }
@@ -651,13 +642,13 @@ list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector
          int nf = actual.f + df[i], nc = actual.c + dc[i];
          if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
-            if (t != 'M' && t != 'P' && t != 'B') {
+            // PROTECCIÓN NIVEL 6: Se añade t != '?'
+            if (t != 'M' && t != 'P' && t != 'B' && t != '?') {
                for (int nop = -1; nop <= 1; nop++) {
                   if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {
                      int nalt = altura[nf][nc] + nop;
                      int dif_alt = actual.altura_mod - nalt;
                      
-                     // REGLA: Fluir por gravedad
                      if (dif_alt == 0 || dif_alt == 1) {
                         int n_energia = actual.energia + CalcularEnergiaTuberiaI(t, nop);
                         int eco_inst_actual = CalcularEcoTuberiaI(terreno[actual.f][actual.c], 0);
@@ -665,10 +656,6 @@ list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector
                         
                         if (n_energia <= max_energia && n_eco <= max_eco) {
                            Padre estado_hijo = {nf, nc, nop};
-                           
-                           // Como la cola de prioridad saca SIEMPRE las rutas más cortas primero,
-                           // cualquier ruta nueva que llegue aquí será igual de larga o más larga.
-                           // Por tanto, SOLO la exploramos si mejora el impacto ecológico.
                            if (min_eco_visto.find(estado_hijo) == min_eco_visto.end() || n_eco < min_eco_visto[estado_hijo]) {
                               min_eco_visto[estado_hijo] = n_eco;
                               
@@ -677,9 +664,8 @@ list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector
                               hijo.altura_mod = nalt;
                               hijo.energia = n_energia; hijo.eco = n_eco; 
                               hijo.dist = actual.dist + 1;
-                              hijo.camino = actual.camino; // Copiamos el historial
-                              hijo.camino.push_back({nf, nc, nop}); // Añadimos el paso actual
-                              
+                              hijo.camino = actual.camino; 
+                              hijo.camino.push_back({nf, nc, nop}); 
                               frontier.push(hijo);
                            }
                         }
@@ -887,6 +873,148 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_6(Sensores sensores)
 {
+   ActualizarMapa(sensores);
+   if (sensores.superficie[0] == 'D') zapatillas = true;
+
+   // FASE 0: Exploración Reactiva y Búsqueda
+   if (fase_actual == 0) {
+      bool conozco_U = false;
+      
+      // 1. ¿Conocemos alguna 'U'?
+      if(mapaResultado.size() > 0 && mapaResultado[0].size() > 0) {
+         for(int i=0; i<mapaResultado.size(); i++){
+            for(int j=0; j<mapaResultado[0].size(); j++){
+               if(mapaResultado[i][j] == 'U') {
+                  conozco_U = true; 
+                  break;
+               }
+            }
+            if(conozco_U) break;
+         }
+      }
+
+      // LA CLAVE QUE EVITA EL SEGFAULT: Comprobar que BelPos no es -1
+      bool conozco_Belkanita = (sensores.BelPosF != -1 && sensores.BelPosC != -1);
+
+      static int ciclos_exploracion = 0;
+      ciclos_exploracion++;
+
+      // Solo planificamos si conocemos AMBAS cosas
+      if (conozco_U && conozco_Belkanita && (ciclos_exploracion % 15 == 0)) { 
+         int eco_disponible = sensores.max_ecologico - sensores.ecologico;
+         list<Paso> ruta_tuberias = Algoritmo_Tuberias_Ingeniero(sensores.BelPosF, sensores.BelPosC, mapaResultado, mapaCotas, sensores.energia, eco_disponible);
+         
+         if (ruta_tuberias.size() >= 2) {
+            plan_construccion.clear();
+            for (auto tramo : ruta_tuberias) plan_construccion.push_back(tramo);
+            fase_actual = 1; 
+            indice_tramo = 0;
+            ruta_nav.clear();
+            intentos_bloqueo = 0;
+            return IDLE;
+         }
+      }
+      return ComportamientoIngenieroNivel_1(sensores);
+   }
+
+   // FASE 1: Acondicionamiento del terreno (Nivelación)
+   if (fase_actual == 1) {
+      // PROTECCIÓN: Casteo a (int) para evitar underflow si el vector está vacío
+      while (indice_tramo < (int)plan_construccion.size() && plan_construccion[indice_tramo].op == 0) {
+         indice_tramo++;
+      }
+      
+      if (plan_construccion.empty() || indice_tramo >= (int)plan_construccion.size()) {
+         fase_actual = 2; 
+         indice_tramo = 0;
+         ruta_nav.clear();
+         return IDLE;
+      }
+      
+      Paso tramo_objetivo = plan_construccion[indice_tramo];
+      if (sensores.posF == tramo_objetivo.fil && sensores.posC == tramo_objetivo.col) {
+         Action accion_terreno = (tramo_objetivo.op == 1) ? RAISE : DIG;
+         plan_construccion[indice_tramo].op = 0; 
+         ruta_nav.clear();
+         return accion_terreno;
+      } else {
+         ubicacion posicion_destino; 
+         posicion_destino.f = tramo_objetivo.fil; 
+         posicion_destino.c = tramo_objetivo.col;
+         Action act = NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, -1, ruta_nav, intentos_bloqueo);
+         
+         if (intentos_bloqueo > 3 || (act == TURN_SR && ruta_nav.empty() && intentos_bloqueo > 0)) {
+            fase_actual = 0; plan_construccion.clear(); ruta_nav.clear(); intentos_bloqueo = 0;
+         }
+         return act;
+      }
+   }
+
+   // FASE 2: Reunión para empezar la instalación
+   if (fase_actual == 2) {
+      if (plan_construccion.size() < 2) { fase_actual = 0; plan_construccion.clear(); return IDLE; }
+      
+      Paso casilla_tecnico = plan_construccion[0];
+      Paso casilla_ingeniero = plan_construccion[1];
+      
+      if (sensores.posF == casilla_ingeniero.fil && sensores.posC == casilla_ingeniero.col) {
+         Orientacion orientacion_necesaria = CalcularOrientacionHaciaObjetivoI(casilla_ingeniero.fil, casilla_ingeniero.col, casilla_tecnico.fil, casilla_tecnico.col);
+         if (sensores.rumbo == orientacion_necesaria) {
+            fase_actual = 3;
+            indice_tramo = 0;
+            ruta_nav.clear();
+            return COME;
+         } else {
+            return TURN_SL;
+         }
+      } else {
+         ubicacion posicion_destino; 
+         posicion_destino.f = casilla_ingeniero.fil; 
+         posicion_destino.c = casilla_ingeniero.col;
+         Action act = NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, 0, ruta_nav, intentos_bloqueo);
+         if (intentos_bloqueo > 3) {
+            fase_actual = 0; plan_construccion.clear(); ruta_nav.clear(); intentos_bloqueo = 0;
+         }
+         return act;
+      }
+   }
+
+   // FASE 3: Instalación y coordinación
+   if (fase_actual == 3) {
+      // PROTECCIÓN CLAVE: empty() y (int)
+      if (plan_construccion.empty() || indice_tramo >= (int)plan_construccion.size() - 1) {
+         fase_actual = 0; plan_construccion.clear(); return IDLE; 
+      }
+
+      Paso casilla_tecnico = plan_construccion[indice_tramo];
+      Paso casilla_ingeniero = plan_construccion[indice_tramo + 1];
+
+      if (sensores.posF == casilla_ingeniero.fil && sensores.posC == casilla_ingeniero.col) {
+         Orientacion orientacion_necesaria = CalcularOrientacionHaciaObjetivoI(casilla_ingeniero.fil, casilla_ingeniero.col, casilla_tecnico.fil, casilla_tecnico.col);
+         
+         if (sensores.rumbo == orientacion_necesaria) {
+            if (sensores.enfrente) {
+               indice_tramo++; 
+               ruta_nav.clear(); 
+               return INSTALL;
+            } else {
+               return COME; 
+            }
+         } else {
+            return TURN_SL;
+         }
+      } else {
+         ubicacion posicion_destino; 
+         posicion_destino.f = casilla_ingeniero.fil; 
+         posicion_destino.c = casilla_ingeniero.col;
+         Action act = NavegarHaciaDestinoI(sensores, posicion_destino, zapatillas, mapaResultado, mapaCotas, plan_construccion, indice_tramo, ruta_nav, intentos_bloqueo);
+         if (intentos_bloqueo > 3) {
+            fase_actual = 0; plan_construccion.clear(); ruta_nav.clear(); intentos_bloqueo = 0;
+         }
+         return act;
+      }
+   }
+
    return IDLE;
 }
 
