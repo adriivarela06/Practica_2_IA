@@ -57,11 +57,13 @@ struct NodoTuberiaT {
    int op;                
    int energia;
    int eco;       
-   int dist;      
+   int dist;
+   list<Paso> camino;   
 
    bool operator>(const NodoTuberiaT &otro) const {
       if (dist != otro.dist) return dist > otro.dist;
-      return (energia + eco) > (otro.energia + otro.eco);
+      if (eco != otro.eco) return eco > otro.eco;
+      return energia > otro.energia;
    }
 };
 
