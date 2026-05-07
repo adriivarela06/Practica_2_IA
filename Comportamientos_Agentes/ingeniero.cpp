@@ -731,13 +731,17 @@ Action NavegarHaciaDestinoI(Sensores &sensores, ubicacion objetivo, bool tiene_z
 
       if (a == WALK) {
          if (sensores.agentes[2] != '_') colision = true;
-         if (abs(sensores.cota[2] - sensores.cota[0]) > max_dif)
-            ruta_nav.clear(); return IDLE;
+         if (abs(sensores.cota[2] - sensores.cota[0]) > max_dif){
+            ruta_nav.clear();
+            return IDLE;
+         }
       }
       else if (a == JUMP) {
          if (sensores.agentes[2] != '_' || sensores.agentes[6] != '_') colision = true;
-         if (abs(sensores.cota[6] - sensores.cota[0]) > max_dif)
-            ruta_nav.clear(); return IDLE;
+         if (abs(sensores.cota[6] - sensores.cota[0]) > max_dif){
+            ruta_nav.clear(); 
+            return IDLE;
+         }
       }
 
       if (colision) {
@@ -881,7 +885,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_6(Sensores sensores
             for(int j=0; j<mapaResultado[0].size() && !salida; j++){
                if(mapaResultado[i][j] == 'U') {
                   conozco_U = true; 
-                  salida == true;
+                  salida = true;
                }
             }
             if(conozco_U) break;

@@ -693,15 +693,19 @@ Action NavegarHaciaDestinoT(Sensores &sensores, ubicacion objetivo, bool tiene_z
 
       if (a == WALK) {
          if (sensores.agentes[2] != '_') colision = true;
-         if (abs(sensores.cota[2] - sensores.cota[0]) > 1) 
-            ruta_nav.clear(); return IDLE;
+         if (abs(sensores.cota[2] - sensores.cota[0]) > 1){
+            ruta_nav.clear(); 
+            return IDLE;
+         }
          
       }
 
       if (colision) {
          intentos_bloqueo++;
-         if (intentos_bloqueo > 3)
-            ruta_nav.clear(); intentos_bloqueo = 0;
+         if (intentos_bloqueo > 3){
+            ruta_nav.clear(); 
+            intentos_bloqueo = 0;
+         }
 
          return IDLE;
       }
