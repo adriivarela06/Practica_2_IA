@@ -515,19 +515,13 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
    }
 
    if (hayPlan && !plan.empty()) {
-      Action a = plan.front();
-      bool choque = false;
+      accion = plan.front();
       ubicacion actual = {sensores.posF, sensores.posC, sensores.rumbo};
 
-      if (a == WALK && sensores.agentes[2] != '_')
-         choque = true;
-
-      if (choque)
+      if (accion == WALK && sensores.agentes[2] != '_')
          accion = IDLE;
-      else {
-         accion = plan.front();
+      else
          plan.pop_front();
-      }
    }
    
    if (plan.empty())

@@ -639,7 +639,7 @@ list<Paso> Algoritmo_Tuberias_Ingeniero(int inicio_f, int inicio_c, const vector
          int nf = actual.f + df[i], nc = actual.c + dc[i];
          if (nf >= 0 && nf < filas && nc >= 0 && nc < cols) {
             unsigned char t = terreno[nf][nc];
-
+            //PROTECCIÓN NIVEL 6
             if (t != 'M' && t != 'P' && t != 'B' && t != '?') {
                for (int nop = -1; nop <= 1; nop++) {
                   if (!(nop != 0 && t == 'A') && !(nop == 1 && altura[nf][nc] >= 9) && !(nop == -1 && altura[nf][nc] <= 1)) {

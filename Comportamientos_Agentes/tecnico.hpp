@@ -78,9 +78,9 @@ struct PadreT {
 };
 
 struct ComparaNodosT {
-    bool operator()(const NodoT& a, const NodoT& b) const {
-        return (a.coste + a.heuristica) > (b.coste + b.heuristica);
-    }
+   bool operator()(const NodoT& a, const NodoT& b) const {
+      return (a.coste + a.heuristica) > (b.coste + b.heuristica);
+   }
 };
 
 class ComportamientoTecnico : public Comportamiento {
